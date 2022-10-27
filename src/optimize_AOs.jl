@@ -1,13 +1,45 @@
-# TODO: Define criterion j to optimize.
-# Have to be compatible with ForwardDiff types
-function overlap
-    
+# Beware some imaginary parts are non negligeable.
+function reference_eigenvectors(data::Dict{String, Any})
+    ΨA = data["orba.re"] .+ im .* data["orba.im"]
+    ΨB = data["orbb.re"] .+ im .* data["orbb.im"]
+    ΨA, ΨB
 end
 
+function overlap(grid::QuadGrid{T}, AOs_on_grid::Matrix{T}) where {T<:Real}
+    S = dot(grid, AOs_on_grid, AOs_on_grid)
+    (cond(S) > 1e8) && (@warn "The conditioning of the overlap is higher that 1e8")
+    S
+end
+
+######################### TODO: Code criterion j to optimize.
 """
 For now just handles L2 projection
 """
-function j_diatomic(el_1, el_2, R1, R2, Ψ_ref)
-    
-end
+function j_diatomic(XA::Vector{T1},  XB::Vector{T1},
+                    A₀::Element{T2}, B₀::Element{T2},
+                    RA::Vector{T2},  RB::Vector{T2},
+                    # reference eigenvectors at positions RA and RB
+                    ΨA::Matrix{T3}, ΨB::Matrix{T3}, 
+                    grid::QuadGrid{T2}) where {T1,T2 <: Real, T3}
+    # Reshape the vectors XA and XB as shells to be understood by construct_AOs
+    A = Element(XA, A₀)
+    B = Element(XB, B₀)
 
+    # Construct the AO_basis and eval on the integration grid
+    # I Tried to multithread but not sure that's the good way to do so
+    AOs = vcat(     construct_AOs(A; position=RA, grid.mmax),
+                    construct_AOs(B; position=RB, grid.mmax))
+    𝐗 = eval_AOs(grid, AOs) ####################################### <- speedup needed
+    
+    # Orthonormalize
+    S = overlap(grid, AOs)
+    𝐗_ortho = 𝐗*inv(sqrt(Symmetric(S)))
+
+    # Compute projection on the AO basis
+    j_out = zero(T1) # not sure about type here for ForwardDiff
+    for X in 𝐗 # run over all AOs
+        j_out += sum(abs2, dot(grid, X, ΨA)) # project A eigenvectors
+        j_out += sum(abs2, dot(grid, X, ΨB)) # project B eigenvectors
+    end
+    j_out
+end
