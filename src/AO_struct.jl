@@ -50,6 +50,6 @@ function construct_AOs(X::Element;
     end
     AO_basis
 end
-eval_AOs(AOs::Vector{AO}, grid::QuadGrid) = hcat(map(Χμ->Χμ.(grid.points), AOs)...)
+eval_AOs(grid::QuadGrid, AOs::Vector{AO}) = hcat(map(Χμ->Χμ.(grid.points), AOs)...)
 
 
