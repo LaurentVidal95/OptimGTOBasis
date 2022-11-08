@@ -52,7 +52,6 @@ end
 Produce all needed data for the optimization 
 given HelFEM file and the name of the wanted GTO basis. 
 Outputs are:
-
    • Two vectors "A" and "B"  containing the respective contracting coeffs and
      exponent of two elements for the given basis.
      Each vector is composed of NamedTuples with args "exps" and "coeffs".
@@ -78,7 +77,7 @@ function extract_elements(datafile::String, basis::String)
     file = h5open(datafile)
     data = read(file)
     close(file)
-    initial_data(data, basis)
+    extract_elements(data, basis)
 end
 
 """

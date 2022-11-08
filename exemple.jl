@@ -7,7 +7,7 @@ data = read(file)
 close(file)
 
 # Construct elements and grid
-basis = "cc-pvdz"
+basis = "6-31G"
 H, RH, F, RF =  extract_elements(data, basis)
 grid = QuadGrid(data)
 
@@ -18,8 +18,8 @@ SB =  dot(grid, ΨB, ΨB)
 @show (norm(SA - I), norm(SB - I))
 
 # Contruct AOs for H and eval on the grid
-AOs_H = construct_AOs(H; position=RH, mmax=grid.mmax)
-AOs_on_grid = eval_AOs(grid, AOs_H)
+# AOs_H = construct_AOs(H; position=RH, mmax=grid.mmax)
+# AOs_on_grid = eval_AOs(grid, AOs_H)
 
-# Compute overlap
-S = overlap(grid, AOs_on_grid)
+# # Compute overlap
+# S = overlap(grid, AOs_on_grid)

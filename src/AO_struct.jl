@@ -6,7 +6,7 @@ struct RadialPart{T<:Real}
     exps   ::Vector{T}
     coeffs ::Vector{T}
 end
-(Rnl::RadialPart)(X) = Rnl.coeffs'exp.(map(ζ -> exp(-ζ*norm(X)^2), Rnl.exps))
+(Rnl::RadialPart)(X) = Rnl.coeffs'exp.(map(ζ -> -ζ*norm(X)^2, Rnl.exps))
 
 """
 Ψ_{nlm} = Y_lm * R_nl
@@ -14,13 +14,13 @@ end
 • The real spherical harmonics is defined with the SphericalHarmonicExpansions
   package.
 """
-struct AO{T<:Real, F}
-    Rnl    ::RadialPart{T}
+struct AO{T1, T2<:Real, F}
+    Rnl    ::RadialPart{T1}
     Ylm    ::F
-    center ::Vector{T}
+    center ::Vector{T2}
 end
-function AO(l::Int64, m::Int64, exps::Vector{T}, coeffs::Vector{T},
-            center::Vector{T}) where {T<:Real}
+function AO(l::Int64, m::Int64, exps::Vector{T1}, coeffs::Vector{T1},
+            center::Vector{T2}) where {T1, T2<:Real}
     Rnl = RadialPart(exps, coeffs)
     @polyvar x y z
     Ylm(r1,r2,r3) = rlylm(l, m, x, y, z)((x,y,z)=>(r1,r2,r3))
@@ -34,16 +34,18 @@ exps and coeffs, corresponding to the Gaussians for that shell.
 """
 function construct_AOs(X::Element;
                        position=zeros(T, 3), # [0., 0., ± Rh]
-                       mmax) where {T<:Real}
+                       mmax,
+                       verbose=true) where {T<:Real}
     AO_basis = AO[]
-    @info "Added AOs: "
+    (verbose) && (@info "Added AOs: ")
     # Run other n, l and m ∈ {-l,...,l} and add each corresponding AO
     for (i_shell, shell) in enumerate(X.shells)
         l = i_shell-1
         for n in 1:size(shell.coeffs,2)
             for m in -min(mmax, l):min(mmax,l)
                 label = ["s","p","d","f","g"][i_shell]
-                println(@sprintf("%-10s %-6s",  "Χ_{$(n+l)$l$m}", "$(n+l)$label"))
+                (verbose) && (println(@sprintf("%-10s %-6s",
+                              "Χ_{$(n+l)$l$m}", "$(n+l)$label")))
                 push!(AO_basis, AO(l, m, shell.exps, vec(shell.coeffs[:,n]), position))
             end
         end
