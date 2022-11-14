@@ -41,3 +41,25 @@ function dot(grid::QuadGrid{T1}, Ψ1, Ψ2) where {T1<:Real, T2}
     # @assert( length(grid.weights) == length(Ψ1) == length(Ψ2) )
     (grid.weights .* Ψ1)'Ψ2
 end
+
+"""
+Assert that the integration error over the given grid is lower
+ that machine (double) precision
+"""
+function test_spread(grid::QuadGrid, ζ; int_tol)
+    g(X) = (π/ζ)^(-3/2)*exp(-ζ*norm(X)^2)
+    ∫g = sum(grid.weights .* g.(grid.points))
+    return abs(1 - ∫g) < int_tol
+end
+
+"""
+Computes within 5 units the maximum ζ that can be integrated on the integration grid
+with maximum error int_tol.
+"""
+function default_spread_lim(grid;int_tol)
+    spread_lim = 20
+    while test_spread(grid, spread_lim; int_tol)
+        spread_lim += 5
+    end
+    spread_lim
+end
