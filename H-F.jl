@@ -41,11 +41,10 @@ function j2opt(X_log::Vector{T};
     # and that the contracting coefficient is not to high
     ζ_max = maximum([maximum_ζ(A), maximum_ζ(B)])
     c_max = maximum([maximum_c(A), maximum_c(B)])
-    @show ζ_max.value, c_max.value
     ((ζ_max > spread_lim) | (c_max > ctr_coeff_lim)) && (return Inf)
     
-    # return -j to minimize
-    -j_diatomic(A, B, RH, RF, ΨA, grid)
+    # return j to minimize
+    j_diatomic(A, B, RH, RF, ΨA, grid)
 end
 
 

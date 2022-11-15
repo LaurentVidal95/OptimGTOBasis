@@ -20,6 +20,6 @@ export j_diatomic
 include("numerical_integration.jl")
 include("Element_struct.jl")
 include("AO_struct.jl")
-include("optimize_AOs.jl")
+include("projection_criterion.jl")
 
 end # module
