@@ -56,7 +56,7 @@ end
 Computes within 5 units the maximum ζ that can be integrated on the integration grid
 with maximum error int_tol.
 """
-function default_spread_lim(grid;int_tol)
+function compute_spread_lim(grid;int_tol)
     spread_lim = 20
     while test_spread(grid, spread_lim; int_tol)
         spread_lim += 5

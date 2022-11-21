@@ -15,8 +15,8 @@ export construct_AOs
 export eval_AOs
 export extract_elements
 export reference_eigenvectors
-export overlap
-export j_diatomic
+export j_L2_diatomic
+export setup_bounds
 include("numerical_integration.jl")
 include("Element_struct.jl")
 include("AO_struct.jl")

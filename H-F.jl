@@ -2,51 +2,57 @@ using OptimAOsDiatomic
 using Optim
 using HDF5
 
-# extract data file
-file = h5open("data/H-F/data_1.hdf5")
-data = read(file)
-close(file)
+function launch_optimization(data_dir)
+    # Add read all files
 
-# Construct elements and grid
-basis = "sto-2G"
-H, RH, F, RF =  extract_elements(data, basis)
-grid = QuadGrid(data)
+    # extract data file
+    file = h5open("data/H-F/data_1.hdf5")
+    data = read(file)
+    close(file)
 
-# Extract eigenvectors and check normalization
-ΨA, ΨB = reference_eigenvectors(data)
+    # Construct elements and grid
+    basis = "sto-2G"
+    A, RA, B, RB =  extract_elements(data, basis)
+    grid = QuadGrid(data)
 
-# Launch optimization
-X_init = map(x-> iszero(x) ? 1e-5 : x, vcat(vec(H), vec(F)))
-nH = length(vec(H))
+    # Extract eigenvectors and check normalization
+    Ψα, Ψβ = reference_eigenvectors(data)
 
-maximum_ζ(A::Element) = maximum(maximum.([shell.exps for shell in A.shells]))
-maximum_c(A::Element) = maximum(maximum.([shell.coeffs for shell in A.shells]))
+    # Launch optimization
+    X_init = map(x-> iszero(x) ? 1e-5 : x, vcat(vec(A), vec(B)))
+    nA = length(vec(A))
 
-"""
-The optimization has to be constrained to positive parameters. As a result
-the X in entry is the log of the actual parameters to so that exp(X) is always positive.
-"""
-function j2opt(X_log::Vector{T};
-               spread_lim=default_spread_lim(grid; int_tol=1e-13),
-               # default value for ctr_coeff_lim associated to conditioning to be found
-               ctr_coeff_lim=1e2) where {T<:Real}
-    # Retrieve positive parameters
-    X = exp.(X_log)
+    maximum_ζ(A::Element) = maximum(maximum.([shell.exps for shell in A.shells]))
+    maximum_c(A::Element) = maximum(maximum.([shell.coeffs for shell in A.shells]))
 
-    # Reshape the vectors XA and XB as shells to be understood by construct_AOs
-    XA, XB = X[1:nH], X[nH+1:end]
-    A = Element(XA, H)
-    B = Element(XB, F)
-    # Checks that the primitive with minimum spread can be itegrated
-    # and that the contracting coefficient is not to high
-    ζ_max = maximum([maximum_ζ(A), maximum_ζ(B)])
-    c_max = maximum([maximum_c(A), maximum_c(B)])
-    ((ζ_max > spread_lim) | (c_max > ctr_coeff_lim)) && (return Inf)
-    
-    # return j to minimize
-    j_diatomic(A, B, RH, RF, ΨA, grid)
+    """
+    The optimization has to be constrained to positive parameters. As a result
+    the X in entry is the log of the actual parameters to so that exp(X) is always positive.
+    """
+    function j2opt(X_log::Vector{T};
+                   spread_lim=default_spread_lim(grid; int_tol=1e-13),
+                   # default value for ctr_coeff_lim associated to conditioning to be found
+                   ctr_coeff_lim=1e2) where {T<:Real}
+        # Retrieve positive parameters
+        X = exp.(X_log)
+
+        # Reshape the vectors XA and XB as shells to be understood by construct_AOs
+        XA, XB = X[1:nA], X[nA+1:end]
+        A = Element(XA, A)
+        B = Element(XB, B)
+        # Checks that the primitive with minimum spread can be itegrated
+        # and that the contracting coefficient is not to high
+        ζ_max = maximum([maximum_ζ(A), maximum_ζ(B)])
+        c_max = maximum([maximum_c(A), maximum_c(B)])
+        ((ζ_max > spread_lim) | (c_max > ctr_coeff_lim)) && (return Inf)
+        
+        # return j to minimize
+        sum(j_diatomic(A, B, RA, RB, Ψα, grid) for (RA, RB) in positions)
+    end
+    res = optimize(X->j2opt(X; spread_lim=default_spread_lim(grid; int_tol=1e-8)),
+                   log.(X_init), LBFGS(), autodiff=:forward, Optim.Options(show_trace=true))
+    res
 end
-
 
 # function prune_zeros(X)
 #     ids = [x[1] for x in filter(x->iszero(x[2]), collect(enumerate(X)))]
