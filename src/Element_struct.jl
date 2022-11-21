@@ -49,28 +49,20 @@ function Element(X_vec::Vector{T1}, X_ref::Element{T2}) where {T1, T2 <:Real}
 end
 
 """
-Produce all needed data for the optimization 
-given HelFEM file and the name of the wanted GTO basis. 
-Outputs are:
+Construct the Element objects associated to a given HelFEM file and GTO basis.
+Output:
    • Two vectors "A" and "B"  containing the respective contracting coeffs and
      exponent of two elements for the given basis.
      Each vector is composed of NamedTuples with args "exps" and "coeffs".
      Each NamedTuple corresponds to a shell (s, p, d, ...)
-
-   • The positions of the respective atoms of the diatomic molecule A-B
 """
 function extract_elements(data::Dict{String, Any}, basis::String)
     # Extract info from data
     Z1, Z2 = data["Z1"], data["Z2"]
     elements = element_name.([Z1,Z2])
-    Rh = data["Rh"]    
     # Create GTO basis coefficient and exponent for each elements
     # using basis_set_exchange
     A, B = extract_coeffs_and_exponents(elements, basis)
-    RA = [0., 0., -Rh]
-    RB = [0., 0., +Rh]
-    # Return elements and respective positions
-    A, RA, B, RB
 end
 
 function extract_elements(datafile::String, basis::String)

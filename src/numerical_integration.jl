@@ -46,19 +46,19 @@ end
 Assert that the integration error over the given grid is lower
  that machine (double) precision
 """
-function test_spread(grid::QuadGrid, ζ; int_tol)
+function test_spread(grid::QuadGrid, ζ; num∫tol)
     g(X) = (π/ζ)^(-3/2)*exp(-ζ*norm(X)^2)
     ∫g = sum(grid.weights .* g.(grid.points))
-    return abs(1 - ∫g) < int_tol
+    return abs(1 - ∫g) < num∫tol
 end
 
 """
 Computes within 5 units the maximum ζ that can be integrated on the integration grid
-with maximum error int_tol.
+with maximum error num∫tol.
 """
-function compute_spread_lim(grid;int_tol)
+function compute_spread_lim(grid;num∫tol)
     spread_lim = 20
-    while test_spread(grid, spread_lim; int_tol)
+    while test_spread(grid, spread_lim; num∫tol)
         spread_lim += 5
     end
     spread_lim
