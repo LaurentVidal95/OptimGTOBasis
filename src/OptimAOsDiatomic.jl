@@ -6,7 +6,8 @@ using SphericalHarmonicExpansions # Construction of AOs
 using Printf                      # Printing AO labels
 using LinearAlgebra
 using ThreadsX
-using Optim
+using JuMP
+using Ipopt
 
 export QuadGrid
 export default_spread_lim
@@ -23,9 +24,10 @@ include("AO_struct.jl")
 
 export j_L2_diatomic
 export reference_eigenvectors
-export setup_bounds
 export extract_ref_data
-export launch_optimization
+export setup_bounds!
+export setup_optim_model
+# export launch_optimization
 include("projection_criterion.jl")
 include("setup_optim.jl")
 

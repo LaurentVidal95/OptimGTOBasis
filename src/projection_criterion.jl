@@ -27,10 +27,12 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
 end
 function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                        RA::Vector{T2},  RB::Vector{T2},
-                       Ψ_ref::Matrix{T3}, grid::QuadGrid{T2}) where {T1,T2 <: Real, T3}
+                       Ψ_ref::Matrix{T3}, grid::QuadGrid{T2},
+                       ) where {T1,T2 <: Real, T3}
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
     XA, XB = X[1:nA], X[nA+1:end]
+    (eltype(X) ≠ T2) && (@show [x.value for x in X])
     A = Element(XA, A₀)
     B = Element(XB, B₀)
     # return j to minimize
