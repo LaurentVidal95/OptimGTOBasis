@@ -6,7 +6,7 @@ function setup_bounds(grid::QuadGrid{T}, A::Element{T}, B::Element{T};
                       ) where {T <: Real}
     # Maximal possible ζ such that ∫exp(-ζ*|x|²) is integrated with precsion "num∫tol".
     ζ_max = compute_spread_lim(grid; num∫tol)
-    c_max = 1e3
+    c_max = 1e2
 
     # Setup bounds
     nA, nB = length(vec(A)), length(vec(B))
@@ -35,7 +35,7 @@ function extract_ref_data(basis::String, datadir::String)
     output_data = (;)
     Rhs = []
     Ψs_ref = []
-
+    grids = QuadGrid[]
     # Run through all JSON file. Only interatomic distance Rh changes for each file.
     for filename in joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
@@ -44,35 +44,38 @@ function extract_ref_data(basis::String, datadir::String)
             if (isempty(Rhs))
                 A, B = extract_elements(data, basis)
                 Elements = [A,B]
-                grid = QuadGrid(data)
-                output_data = merge(output_data, (;Elements, grid))
-            end
-            
+                output_data = merge(output_data, (;Elements))
+            end            
             push!(Rhs, data["Rh"])
             push!(Ψs_ref, reference_eigenvectors(data)[1])
+            push!(grids, QuadGrid(data))
         end       
     end
 
     # Return all data as a NamedTuple
-    merge(output_data, (; Rhs, Ψs_ref, basis))
+    merge(output_data, (; Rhs, Ψs_ref, grids, basis))
 end
 
-function launch_optimization(ref_data; num∫tol=1e-7)
+function launch_optimization(ref_data; num∫tol=1e-7,
+                             method=LBFGS,
+                             kwargs...)
     # Inequality constraints of the basis optimization
-    upper, lower = setup_bounds(ref_data.grid, ref_data.Elements...; num∫tol)
+    i_rough_grid = findmin([compute_spread_lim(grid; num∫tol) for grid in ref_data.grids])[2]
+    upper, lower = setup_bounds(ref_data.grids[i_rough_grid], ref_data.Elements...; num∫tol)
     # Print optimization parameters
     @info "GTO basis optimization\n"*
         "basis: $(ref_data.basis)\n"* "ζ_max: $(upper[1])\n"*
         "Maximum numerical integration error: $(num∫tol)"
 
     A, B = ref_data.Elements
-    grid = ref_data.grid
 
     # Define objective function
     function j2opt(X::Vector{T}) where {T<:Real}
+        # @show [x.value for x in X]
         accu = zero(T)
         for (i, Rh) in enumerate(ref_data.Rhs)
-            accu += j_L2_diatomic(X, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i], grid)
+            accu += j_L2_diatomic(X, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i],
+                                  ref_data.grids[i])
         end
         accu
     end
@@ -83,8 +86,9 @@ function launch_optimization(ref_data; num∫tol=1e-7)
         error("Some GTO cannot be integrated on the grid with"*
               " an error inferior to $(num∫tol). Lower num∫tol at your own risks.")
     end
-
+    @show lower, upper
     # Optimize with Fminbox routine (adapted for inequality constraints optimization)
-    res = optimize(j2opt, lower, upper, X_init, Fminbox(LBFGS()),
-                   Optim.Options(show_trace=true, extended_trace=true), autodiff=:forward);    
+    res = optimize(j2opt, lower, upper, X_init, Fminbox(method(;kwargs...)),
+                   Optim.Options(show_trace=true, extended_trace=true, iterations=20),
+                   autodiff=:forward);    
 end
