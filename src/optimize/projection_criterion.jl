@@ -10,12 +10,11 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
     # Construct the AO_basis and eval on the integration grid
     AOs = vcat(construct_AOs(A; position=RA, grid.mmax, verbose=false),
                construct_AOs(B; position=RB, grid.mmax, verbose=false))
-    𝐗 = eval_AOs(grid, AOs) ####################################### <- speedup needed
+    normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
+    𝐗 = normalize_col(eval_AOs(grid, AOs))  ####################################### <- speedup needed
 
     # Compute the projection of ΨA on the AO basis
-    n = length(𝐗)
     S = dot(grid, 𝐗, 𝐗)
-
     # Switch from Dual type to Float64 if needed for inversion of S
     if eltype(𝐗) ≠ T2
         S = [x.value for x in S]
@@ -23,7 +22,8 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
     Γ = dot(grid, 𝐗, Ψ_ref)
     C = inv(Symmetric(S))*Γ # projection coefficients
 
-    sum(real([1 - 2*a'b + a'S*a for (a,b) in  zip(eachcol(C), eachcol(Γ))])) # sum all distances
+    #Return sum of distances
+    sum(norm(Ψ_ref_i - 𝐗*Ci)^2 for (Ψ_ref_i, Ci) in zip(eachcol(Ψ_ref), eachcol(C)))
 end
 function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                        RA::Vector{T2},  RB::Vector{T2},
@@ -32,7 +32,6 @@ function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
     XA, XB = X[1:nA], X[nA+1:end]
-    (eltype(X) ≠ T2) && (@show [x.value for x in X])
     A = Element(XA, A₀)
     B = Element(XB, B₀)
     # return j to minimize

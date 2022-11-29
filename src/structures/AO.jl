@@ -32,8 +32,8 @@ end
 Element is a vector of shells, each being a named tuple with args
 exps and coeffs, corresponding to the Gaussians for that shell.
 """
-function construct_AOs(X::Element;
-                       position=zeros(T, 3), # [0., 0., ± Rh]
+function construct_AOs(X::Element{T};
+                       position=zeros(Float64, 3), # [0., 0., ± Rh]
                        mmax,
                        verbose=true) where {T<:Real}
     AO_basis = AO[]

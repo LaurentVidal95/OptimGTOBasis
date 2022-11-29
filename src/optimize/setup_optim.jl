@@ -14,6 +14,7 @@ function extract_ref_data(basis::String, datadir::String)
     Rhs = []
     Ψs_ref = []
     grids = QuadGrid[]
+    normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
     # Run through all JSON file. Only interatomic distance Rh changes for each file.
     for filename in joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
@@ -25,7 +26,7 @@ function extract_ref_data(basis::String, datadir::String)
                 output_data = merge(output_data, (;Elements))
             end            
             push!(Rhs, data["Rh"])
-            push!(Ψs_ref, reference_eigenvectors(data)[1])
+            push!(Ψs_ref, normalize_col(reference_eigenvectors(data)[1]))
             push!(grids, QuadGrid(data))
         end       
     end
@@ -69,7 +70,6 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
 
     # Define and register objective function 
     function j2opt(X::T...) where {T<:Real}
-        # @show [x.value for x in X]
         Y = collect(X)
         accu = zero(T)      
         for (i, Rh) in enumerate(ref_data.Rhs)
@@ -82,41 +82,3 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
     @NLobjective(model, Min, j2opt(model[:X]...))
     model
 end
-
-# function launch_optimization(ref_data; num∫tol=1e-7,
-#                              method=LBFGS,
-#                              kwargs...)
-#     # Inequality constraints of the basis optimization
-#     i_rough_grid = findmin([compute_spread_lim(grid; num∫tol) for grid in ref_data.grids])[2]
-#     upper, lower = setup_bounds(ref_data.grids[i_rough_grid], ref_data.Rhs[i],
-#                                 ref_data.Elements...; num∫tol)
-#     # Print optimization parameters
-#     # @info "GTO basis optimization\n"*
-#     #     "basis: $(ref_data.basis)\n"* "ζ_max: $(upper[1])\n"*
-#     #     "Maximum numerical integration error: $(num∫tol)"
-
-#     A, B = ref_data.Elements
-
-#     # Define objective function
-#     function j2opt(X::Vector{T}) where {T<:Real}
-#         # @show [x.value for x in X]
-#         accu = zero(T)
-#         for (i, Rh) in enumerate(ref_data.Rhs)
-#             accu += j_L2_diatomic(X, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i],
-#                                   ref_data.grids[i])
-#         end
-#         accu
-#     end
-
-#     # Start from standard basis
-#     X_init = vcat(vec(A), vec(B))
-#     if maximum(X_init) > upper[1]
-#         error("Some GTO cannot be integrated on the grid with"*
-#               " an error inferior to $(num∫tol). Lower num∫tol at your own risks.")
-#     end
-#     @show lower, upper
-#     # Optimize with Fminbox routine (adapted for inequality constraints optimization)
-#     res = optimize(j2opt, lower, upper, X_init, Fminbox(method(;kwargs...)),
-#                    Optim.Options(show_trace=true, extended_trace=true, iterations=20),
-#                    autodiff=:forward);    
-# end
