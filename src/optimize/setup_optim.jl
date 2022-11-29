@@ -82,3 +82,8 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
     @NLobjective(model, Min, j2opt(model[:X]...))
     model
 end
+
+# TODO
+function extract_optimized_data(model::Model)
+    nothing
+end
