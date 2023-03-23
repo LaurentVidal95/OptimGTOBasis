@@ -1,4 +1,5 @@
-using JuMP, Ipopt
+using JuMP
+using Ipopt
 
 # Beware some imaginary parts are non negligeable.
 function reference_eigenvectors(data::Dict{String, Any})
@@ -15,6 +16,7 @@ function extract_ref_data(basis::String, datadir::String)
     Ψs_ref = []
     grids = QuadGrid[]
     normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
+
     # Run through all JSON file. Only interatomic distance Rh changes for each file.
     for filename in joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
@@ -39,7 +41,7 @@ end
 Define the inequality constraints in Optim.jl conventions.
 """
 function setup_bounds!(model::Model, ref_data, ζ_max::T) where {T <: Real}
-    c_max = 500  # Defaut maximum ctr coefficient
+    c_max = 500  # Defaut maximum absolute value of ctr coefficient
 
     # Extract needed parameters from ref_data
     A, B = ref_data.Elements
@@ -49,10 +51,10 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T) where {T <: Real}
 
     # Setup variables of the problem with constraints in JuMP conventions
     @variable(model, X[i=1:nA+nB], start=X_start[i])
-    @constraint(model, [i=1:n_ζA],    0≤ X[i]      ≤ ζ_max, base_name="spread_A")
-    @constraint(model, [i=1:nA-n_ζA], 0≤ X[i+n_ζA] ≤ c_max, base_name="ctr_A")
-    @constraint(model, [i=1:n_ζB],    0≤ X[nA+i]      ≤ ζ_max, base_name="spread_B")
-    @constraint(model, [i=1:nB-n_ζB], 0≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
+    @constraint(model, [i=1:n_ζA],         0 ≤     X[i]    ≤ ζ_max, base_name="spread_A")
+    @constraint(model, [i=1:nA-n_ζA], -c_max ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
+    @constraint(model, [i=1:n_ζB],         0 ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
+    @constraint(model, [i=1:nB-n_ζB], -c_max ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
     nothing
 end
 
@@ -62,6 +64,7 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
     # Compute maximum spread and setup constrained variables
     ζ_max = findmin([compute_spread_lim(grid, Rh; num∫tol)
                      for (grid, Rh) in zip(ref_data.grids, ref_data.Rhs)])[1]
+    @info "Maximum possible spread for given integration grids: $(ζ_max)"
     setup_bounds!(model, ref_data, ζ_max)
 
     # Extract elements
@@ -79,7 +82,8 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
         accu
     end
     register(model, :j2opt, n_params, j2opt; autodiff=true)
-    @NLobjective(model, Min, j2opt(model[:X]...))
+    X = model[:X]
+    @NLobjective(model, Min, j2opt(X...))
     model
 end
 

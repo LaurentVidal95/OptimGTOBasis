@@ -3,12 +3,11 @@ module OptimAOsDiatomic
 using LinearAlgebra
 using SphericalHarmonicExpansions # Construction of AOs
 using ThreadsX                    # Very basic multi-thread
-using JuMP                        # Optimization wrapper
-using Ipopt                       # Actual NLP solver
 using PyCall                      # Import basis_set_exchange
 using HDF5                        # Extract QuadGrid from checkfile.
 using Printf                      # Cosmetic
-
+using JuMP                        # Optimization wrapper
+using Ipopt
 
 ## All basic structures of the code
 # numerical integration
@@ -17,7 +16,6 @@ export default_spread_lim
 # Spreads and ctr coeffs for each element
 export Element
 export extract_elements
-export generate_basis_file
 # AOs
 export construct_AOs
 export eval_AOs
@@ -36,4 +34,6 @@ export setup_optim_model
 include("optimize/projection_criterion.jl")
 include("optimize/setup_optim.jl")
 
+export generate_basis_file
+include("compare_energies/pyscf_wrapper.jl")
 end # module
