@@ -45,12 +45,13 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T) where {T <: Real}
 
     # Extract needed parameters from ref_data
     A, B = ref_data.Elements
-    X_start = vcat(vec(A), vec(B))
+    X_start = vcat(vec(A), vec(B)) # Initial guess
     nA, nB = length(vec(A)), length(vec(B))
     n_ζA, n_ζB = sum(A.shape_exps), sum(B.shape_exps)
 
-    # Setup variables of the problem with constraints in JuMP conventions
+    # Setup variables of the problem and initial guess.
     @variable(model, X[i=1:nA+nB], start=X_start[i])
+    # Defined boxed constraints with JuMP conventions
     @constraint(model, [i=1:n_ζA],         0 ≤     X[i]    ≤ ζ_max, base_name="spread_A")
     @constraint(model, [i=1:nA-n_ζA], -c_max ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
     @constraint(model, [i=1:n_ζB],         0 ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
@@ -58,6 +59,9 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T) where {T <: Real}
     nothing
 end
 
+"""
+Setup the optimization problem using JuMP framework.
+"""
 function setup_optim_model(ref_data; num∫tol=1e-7)
     model = Model(Ipopt.Optimizer)
 

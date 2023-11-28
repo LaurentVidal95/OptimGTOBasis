@@ -37,7 +37,7 @@ Dot product on the numerical quadrature grid defined as:
 where [ψ1]_k and [ψ2]_k are the vectors of two functions ψ1 and ψ2
 evaluated on the quadrature points.
 """
-function dot(grid::QuadGrid{T1}, Ψ1, Ψ2) where {T1<:Real, T2}
+function dot(grid::QuadGrid{T1}, Ψ1, Ψ2) where {T1<:Real}
     (grid.weights .* Ψ1)'Ψ2
 end
 
