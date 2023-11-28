@@ -11,6 +11,11 @@ end
 function extract_ref_data(basis::String, datadir::String)
     # Extract raw data
     @assert(isdir(datadir))
+    files = joinpath.(Ref(datadir), readdir(datadir))
+    extract_ref_data(basis, files)
+end
+function extract_ref_data(basis::String, files::Vector{String})
+    # Extract raw data
     output_data = (;)
     Rhs = []
     Ψs_ref = []
@@ -18,7 +23,7 @@ function extract_ref_data(basis::String, datadir::String)
     normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
 
     # Run through all JSON file. Only interatomic distance Rh changes for each file.
-    for filename in joinpath.(Ref(datadir), readdir(datadir))
+    for filename in files # joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
             data = read(file)
             # Extract Elements and grid a single time
@@ -45,17 +50,21 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T) where {T <: Real}
 
     # Extract needed parameters from ref_data
     A, B = ref_data.Elements
-    X_start = vcat(vec(A), vec(B)) # Initial guess
+    X_start = A==B ? vec(A) : vcat(vec(A), vec(B)) # Initial guess
     nA, nB = length(vec(A)), length(vec(B))
     n_ζA, n_ζB = sum(A.shape_exps), sum(B.shape_exps)
 
+    n_params = A==B ? nA : nA+nB
+
     # Setup variables of the problem and initial guess.
-    @variable(model, X[i=1:nA+nB], start=X_start[i])
+    @variable(model, X[i=1:n_params], start=X_start[i])
     # Defined boxed constraints with JuMP conventions
     @constraint(model, [i=1:n_ζA],         0 ≤     X[i]    ≤ ζ_max, base_name="spread_A")
     @constraint(model, [i=1:nA-n_ζA], -c_max ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
-    @constraint(model, [i=1:n_ζB],         0 ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
-    @constraint(model, [i=1:nB-n_ζB], -c_max ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
+    if !(A==B)
+        @constraint(model, [i=1:n_ζB],         0 ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
+        @constraint(model, [i=1:nB-n_ζB], -c_max ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
+    end
     nothing
 end
 
@@ -71,9 +80,9 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
     @info "Maximum possible spread for given integration grids: $(ζ_max)"
     setup_bounds!(model, ref_data, ζ_max)
 
-    # Extract elements
+    # Extract elements and handle the A=B case.
     A, B = ref_data.Elements
-    n_params = length(vec(A)) + length(vec(B))
+    n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
 
     # Define and register objective function 
     function j2opt(X::T...) where {T<:Real}

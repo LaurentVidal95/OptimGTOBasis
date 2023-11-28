@@ -23,12 +23,11 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
 
     # Return sum of distances
     criterion = sum(norm(Ψ_ref_i - 𝐗*Ci)^2 for (Ψ_ref_i, Ci) in zip(eachcol(Ψ_ref), eachcol(C)))
-    # Debug
-    if eltype(𝐗) ≠ T2
-        # S = [x.value for x in S]
-        @show cond(S).value
-        @show criterion.value
-    end
+    # # Debug
+    # if eltype(𝐗) ≠ T2
+    #     @show cond(S).value
+    #     @show criterion.value
+    # end
     criterion # + 1e-5*cond(S)
 end
 function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
@@ -37,7 +36,7 @@ function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                        ) where {T1,T2 <: Real, T3}
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
-    XA, XB = X[1:nA], X[nA+1:end]
+    XA, XB = (length(X)==nA) ? (X, X) : (X[1:nA], X[nA+1:end])
     A = Element(XA, A₀)
     B = Element(XB, B₀)
     # return j to minimize

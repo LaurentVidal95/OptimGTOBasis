@@ -57,12 +57,19 @@ Output:
      Each NamedTuple corresponds to a shell (s, p, d, ...)
 """
 function extract_elements(data::Dict{String, Any}, basis::String)
-    # Extract info from data
+    # Extract info from data    
     Z1, Z2 = data["Z1"], data["Z2"]
     elements = element_name.([Z1,Z2])
     # Create GTO basis coefficient and exponent for each elements
     # using basis_set_exchange
-    A, B = extract_coeffs_and_exponents(elements, basis)
+    bse_output = extract_coeffs_and_exponents(elements, basis)
+
+    # Case Z1=Z2
+    if length(bse_output) == 1
+        Z = only(bse_output)
+        return Z, Z
+    end
+    return bse_output
 end
 
 function extract_elements(datafile::String, basis::String)
