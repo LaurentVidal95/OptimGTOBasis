@@ -11,14 +11,17 @@ function generate_basis_file(Elements::Vector{Element{T}}, El_names::Vector{Stri
         for (El, El_name) in zip(Elements, El_names)
             for (i, shell) in enumerate(El.shells)
                 shell_name = shells_names[i]
+                println(fb, "$(El_name)   $(shell_name)")
                 # header
-                for AO in eachcol(shell.coeffs)
-                    println(fb, "$(El_name)   $(shell_name)")
-                    mat2write = hcat(shell.exps, AO)
-                    for row in eachrow(mat2write)
-                        @printf fb "     %-10.8f %-10.8f \n" row...
-                    end
+                mat2write = hcat(shell.exps, shell.coeffs)
+                # for AO in eachcol(shell.coeffs)                    
+                #     mat2write = hcat(shell.exps, AO)
+                n_AO = size(shell.coeffs,2)
+                for row in eachrow(mat2write)
+                    fmt =  Printf.Format("     "*"%10.8f    "^(n_AO+1))
+                    println(fb, Printf.format(fmt, row...))
                 end
+                # end
             end
         end
     end

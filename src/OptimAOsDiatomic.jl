@@ -45,10 +45,10 @@ include("optimize/projection_criterion.jl")
 include("optimize/setup_optim.jl")
 
 export generate_basis_file
-include("compare_energies/pyscf_wrapper.jl")
+include("external/helfem.jl")
+include("external/pyscf.jl")
 
 # Small useful routines
 include("utils.jl")
-include("helfem.jl")
 
 end # module

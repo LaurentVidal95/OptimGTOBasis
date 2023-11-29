@@ -116,3 +116,23 @@ function parse_bse_element(element; T=Float64)
     end
     Element(parsed_shells)
 end
+
+struct Basis{T<:Real}
+    name::String
+    element::String
+    coeffs::Vector{T}
+end
+
+function Element(B::Basis)
+    X_ref = only(extract_coeffs_and_exponents([B.element], B.name))
+    X = B.coeffs
+    Element(X, X_ref)
+end
+
+function save(B::Basis; filename=B.name*"_opt.gbs")
+    X_opt = Element(B)
+    # open(filename, "w") do file
+    # TODO in NWCHEM format or something compatible with BSE
+    # end
+end
+# model[:X]
