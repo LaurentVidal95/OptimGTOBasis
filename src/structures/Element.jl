@@ -1,4 +1,5 @@
 import Base.vec
+import Base.show
 
 # Just renaming
 shelltype(T) = NamedTuple{(:exps, :coeffs), Tuple{Vector{T}, Matrix{T}}}
@@ -7,16 +8,18 @@ shelltype(T) = NamedTuple{(:exps, :coeffs), Tuple{Vector{T}, Matrix{T}}}
 Simple struct to organize all parameters by shells
 """
 struct Element{T<:Real}
+    name::String
+    basis::String
     shells::Vector{shelltype(T)}
     # Shape of the exps vectors and coeffs matrices to switch from
     # single vector to Element form.
     shape_exps::Vector{Int64}
     shape_coeffs::Vector{Tuple{Int64, Int64}}
 end
-function Element(shells::Vector{shelltype(T)}) where {T<:Real}
+function Element(name::String, basis::String, shells::Vector{shelltype(T)}) where {T<:Real}
     shape_exps = [length(shell.exps) for shell in shells]
     shape_coeffs = [size(shell.coeffs) for shell in shells]
-    Element(shells, shape_exps, shape_coeffs)
+    Element(name, basis, shells, shape_exps, shape_coeffs)
 end
 
 """
@@ -45,7 +48,7 @@ function Element(X_vec::Vector{T1}, X_ref::Element{T2}) where {T1, T2 <:Real}
         coeffs = reshape(pop_many!(coeffs_vec, prod(β)), β)
         push!(shells, (; exps, coeffs))
     end
-    Element(shells)
+    Element(X_ref.name, X_ref.basis, shells)
 end
 
 """
@@ -62,14 +65,14 @@ function extract_elements(data::Dict{String, Any}, basis::String)
     elements = element_name.([Z1,Z2])
     # Create GTO basis coefficient and exponent for each elements
     # using basis_set_exchange
-    bse_output = extract_coeffs_and_exponents(elements, basis)
+    bse_elements = parse_bse_elements(elements, basis)
 
     # Case Z1=Z2
-    if length(bse_output) == 1
-        Z = only(bse_output)
+    if length(bse_elements) == 1
+        Z = only(bse_elements)
         return Z, Z
     end
-    return bse_output
+    return bse_elements
 end
 
 function extract_elements(datafile::String, basis::String)
@@ -96,17 +99,18 @@ Return a vector whose elements contain a list of shell
 and associated exponent and coefficients of contracted Gaussians 
 for that shell.
 """
-function extract_coeffs_and_exponents(elements_names::Vector{String}, basis_name::String)
+function parse_bse_elements(elements_names::Vector{String}, basis_name::String)
     bse = pyimport("basis_set_exchange")
     basis = bse.get_basis(basis_name, elements_names, make_general=true)
-    parse_bse_element.(values(basis["elements"]))
+    parsed_shells = parse_bse_shells.(values(basis["elements"]))
+    [Element(name, basis_name, shells) for (name, shells) in zip(elements_names, parsed_shells)]
 end
 
 """
 Return exponent and corresponding contracting coefficients of a given element
 (as a PyObject given by basis_set_exchange) for each shell (s, p, ...)
 """
-function parse_bse_element(element; T=Float64)
+function parse_bse_shells(element; T=Float64)
     shells = element["electron_shells"]
     parsed_shells = shelltype(T)[]
     for shell in shells
@@ -114,25 +118,50 @@ function parse_bse_element(element; T=Float64)
         coeffs = parse.(T, shell["coefficients"])'
         push!(parsed_shells, (;exps, coeffs))
     end
-    Element(parsed_shells)
+    parsed_shells
 end
 
-struct Basis{T<:Real}
-    name::String
-    element::String
-    coeffs::Vector{T}
+"""
+From given elements and elements name, write an AO basis file in NWChem format
+(the one that seems closer to our data structure and that is understood by pyscf).
+"""
+function basis_string(Elements::Vector{Element{T}}) where {T<:Real}
+    El_names = [X.name for X in Elements]
+    @assert(length(Elements)==length(El_names))
+    shells_names = ["S","P","D","F","G"]
+
+    # Loop over all Elements
+    test = ""
+    for (El, El_name) in zip(Elements, El_names)
+        for (i, shell) in enumerate(El.shells)
+            shell_name = shells_names[i]
+            test *= "$(El_name)   $(shell_name)\n"
+            # header
+            mat2write = hcat(shell.exps, shell.coeffs)
+            n_AO = size(shell.coeffs,2)
+            for row in eachrow(mat2write)
+                fmt =  Printf.Format("     "*"%10.8f    "^(n_AO+1))
+                test *= Printf.format(fmt, row...)*"\n"
+            end
+        end
+    end
+    test
+end
+function save_basis(Elements::Vector{Element{T}}, file) where {T<:Real}
+    basis_str = basis_string(Elements)
+    open(file, "w") do output_file
+        println(output_file, basis_str)
+    end
+    nothing
 end
 
-function Element(B::Basis)
-    X_ref = only(extract_coeffs_and_exponents([B.element], B.name))
-    X = B.coeffs
-    Element(X, X_ref)
+function Base.show(io::IO, X::Element)
+    println(io, "Element: $(X.name)")
+    println(io, "Basis type: $(X.basis)")
+    println(io, basis_string([X]))
 end
 
-function save(B::Basis; filename=B.name*"_opt.gbs")
-    X_opt = Element(B)
-    # open(filename, "w") do file
-    # TODO in NWCHEM format or something compatible with BSE
-    # end
+function Element(El_name::String, basis::String, coeffs::Vector{T}) where {T<:Real}
+    X_ref = only(extract_coeffs_and_exponents([El_name], basis))
+    Element(coeffs, X_ref)
 end
-# model[:X]

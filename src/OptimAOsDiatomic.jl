@@ -1,20 +1,25 @@
 module OptimAOsDiatomic
 
 using LinearAlgebra
+using GenericLinearAlgebra        # apply cond or eigvals to matrices of Dual numbers
 using SphericalHarmonicExpansions # Construction of AOs
 using ThreadsX                    # Very basic multi-thread
-using PyCall                      # Import basis_set_exchange
 using HDF5                        # Extract QuadGrid from checkfile.
 using Printf                      # Cosmetic
 using JuMP                        # Optimization wrapper
 using Ipopt                       # Actual NL solver
 
-# DEBUG
-using LegendrePolynomials
-using Optim
-#
+# Import pyscf globaly
+using PyCall                      # Import basis_set_exchange
+const pyscf = PyNULL()
+function __init__()
+    copy!(pyscf, pyimport("pyscf"))
+end
 
-## All basic structures of the code
+# # DEBUG
+# using LegendrePolynomials
+# using Optim
+#
 
 # numerical integration
 export QuadGrid
@@ -31,23 +36,22 @@ include("structures/QuadGrid.jl")
 include("structures/Element.jl")
 include("structures/AO.jl")
 
-## Optimization of the AO basis
-
 # Extract data from basis_set_exchange
 export reference_eigenvectors
 export extract_ref_data
 
 # Construct and solve optimization problem
-export j_L2_diatomic # optimize ||Ψ_ref - proj(Ψ_ref)||_L²
+export j_L2_diatomic           # optimize ||Ψ_ref - proj(Ψ_ref)||_L²
+export j_E_diatomic            # optimize ||E(X) - E_ref||^2
 export setup_bounds!
 export setup_optim_model
 include("optimize/projection_criterion.jl")
 include("optimize/setup_optim.jl")
 
+# HelFEM and PySCF
 export generate_basis_file
 include("external/helfem.jl")
 include("external/pyscf.jl")
-
 # Small useful routines
 include("utils.jl")
 

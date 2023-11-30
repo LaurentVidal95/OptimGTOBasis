@@ -2,14 +2,12 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
                     multiplicity=1,
                     method="HF",
                     output_dir= Z1==Z2 ? Z1*"2_data" : Z1*Z2*"_data",
-                    verbose=true,
                     helfem_path) where {T<:Real}
     # List of helfem routines
     helfem_commands = [joinpath(helfem_path, "objdir/src", command) for command in
                        ["diatomic_cbasis", "diatomic", "diatomic_dgrid"]]
 
     !isdir(output_dir) && mkdir(output_dir)
-    run_fct = verbose ? cmd->run(cmd) : cmd->read(cmd, String)
     
     # 1) Run cbasis routine to optimize the discretization basis to run helfem
     command = `$(helfem_commands[1]) --Z1=$(Z1) --Z2=$(Z2) --Rbond=$(Rbond) --angstrom=0`
@@ -19,16 +17,23 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     # 2) Run the .diatomic command
     cmd_in = [helfem_commands[2], String.(split(cmd_output," "; keepempty=false))...,
               "--M=$(multiplicity)", "--method=$(method)", "--save=$(output_dir)/helfem_$(Rbond).chk"]
-    run_fct(Cmd(cmd_in))
+    cmd_output = read(Cmd(cmd_in), String)
+    cmd_output = split(cmd_output,"\n",keepempty=false)
+    e_tot = split(filter(x->contains(x,"Total energy"), cmd_output)[end]," ")[end]
+    e_tot = parse(Float64, e_tot)
 
-    # 3) Extract data from checkfile
+    # 3) Extract grid data from checkfile
+    output_file = "$(output_dir)/helfem_$(Rbond).hdf5"
     cmd_in = [helfem_commands[3], "--load=$(output_dir)/helfem_$(Rbond).chk",
-              "--output=$(output_dir)/helfem_$(Rbond).hdf5"]
-    run_fct(Cmd(cmd_in))
+              "--output=$(output_file)"]
+    read(Cmd(cmd_in), String)
 
     # Clean the working dir
     rm("$(output_dir)/helfem_$(Rbond).chk")
     isfile("fort.9") && rm("fort.9")
+
+    # Add e_tot to the HDF5 file.
+    h5write(output_file, "Total energy", e_tot)
     nothing
 end
 
