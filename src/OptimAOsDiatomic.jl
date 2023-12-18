@@ -45,7 +45,7 @@ export j_L2_diatomic           # optimize ||Ψ_ref - proj(Ψ_ref)||_L²
 export j_E_diatomic            # optimize ||E(X) - E_ref||^2
 export setup_bounds!
 export setup_optim_model
-include("optimize/projection_criterion.jl")
+include("optimize/optimizatin_criteria.jl")
 include("optimize/setup_optim.jl")
 
 # HelFEM and PySCF

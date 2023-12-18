@@ -32,32 +32,39 @@ function extract_ref_data(basis::String, files::Vector{String})
                 A, B = extract_elements(data, basis)
                 Elements = [A,B]
                 output_data = merge(output_data, (;Elements))
-            end            
+            end
             push!(Rhs, data["Rh"])
             push!(Ψs_ref, normalize_col(reference_eigenvectors(data)[1]))
             push!(grids, QuadGrid(data))
             push!(Energies, data["Total energy"])
-        end       
+        end
     end
 
     # Return all data as a NamedTuple
     merge(output_data, (; Rhs, Ψs_ref, grids, basis, Energies))
 end
 
+function default_starting_point(ref_data)
+    A, B = ref_data.Elements
+    X_start = A==B ? vec(A) : vcat(vec(A), vec(B)) # Initial guess
+    X_start
+end
+
 """
 Define the inequality constraints in Optim.jl conventions.
 """
 function setup_bounds!(model::Model, ref_data, ζ_max::T;
-                       exps_tol=1e-2) where {T <: Real}
+                       exps_tol=1e-2,
+                       X_start=default_starting_point(ref_data)) where {T <: Real}
     c_max = 500  # Defaut maximum absolute value of ctr coefficient
 
     # Extract needed parameters from ref_data
     A, B = ref_data.Elements
-    X_start = A==B ? vec(A) : vcat(vec(A), vec(B)) # Initial guess
     nA, nB = length(vec(A)), length(vec(B))
+    n_params = A==B ? nA : nA+nB
+    @assert length(X_start)==n_params
     n_ζA, n_ζB = sum(A.shape_exps), sum(B.shape_exps)
 
-    n_params = A==B ? nA : nA+nB
 
     # Setup variables of the problem and initial guess.
     @variable(model, X[i=1:n_params], start=X_start[i])
@@ -84,7 +91,8 @@ function setup_optim_model(ref_data; criterion=:energy, kwargs...)
     nothing
 end
 
-function setup_optim_model_density(ref_data; num∫tol=1e-7)
+function setup_optim_model_density(ref_data; num∫tol=1e-7,
+                                   X_start=default_starting_point(ref_data))
     @info "Setup model for density criterion"
     model = Model(Ipopt.Optimizer)
 
@@ -92,13 +100,13 @@ function setup_optim_model_density(ref_data; num∫tol=1e-7)
     ζ_max = findmin([compute_spread_lim(grid, Rh; num∫tol)
                      for (grid, Rh) in zip(ref_data.grids, ref_data.Rhs)])[1]
     @info "Maximum possible spread for given integration grids: $(ζ_max)"
-    setup_bounds!(model, ref_data, ζ_max)
+    setup_bounds!(model, ref_data, ζ_max; X_start)
 
     # Extract elements and handle the A=B case.
     A, B = ref_data.Elements
     n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
-    
-    # Define and register objective function 
+
+    # Define and register objective function
     function j2opt(X::T...) where {T<:Real}
         Y = collect(X)
         accu = zero(T)
@@ -114,7 +122,8 @@ function setup_optim_model_density(ref_data; num∫tol=1e-7)
     model
 end
 
-function setup_optim_model_energy(ref_data; max_spread=200)
+function setup_optim_model_energy(ref_data; max_spread=200,
+                                  X_start=default_starting_point(ref_data))
     @info "Setup model for energy criterion"
 
     model = Model(Ipopt.Optimizer)
@@ -122,12 +131,12 @@ function setup_optim_model_energy(ref_data; max_spread=200)
     # Compute maximum spread and setup constrained variables
     ζ_max = max_spread
     @info "Maximum spread for given integration grids: $(ζ_max)"
-    setup_bounds!(model, ref_data, ζ_max)
+    setup_bounds!(model, ref_data, ζ_max; X_start)
 
     # Extract elements and handle the A=B case.
     A, B = ref_data.Elements
     n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
-    
+
     function j2opt(X::T...) where {T<:Real}
         Y = collect(X)
         sum([j_E_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], E)

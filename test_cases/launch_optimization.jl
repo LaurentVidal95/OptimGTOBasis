@@ -7,9 +7,9 @@ datadir=joinpath(splitpath(pathof(OptimAOsDiatomic))[1:end-3]...,"data/H2")
 num∫tol = 1e-9
 
 function optimize_AO_basis(basis::String, datadir::String;
-                           maxiter=50)
-    H2_data = extract_ref_data(basis, datadir)#[joinpath(datadir,"helfem_1.4.hdf5")])
-    model = setup_optim_model(H2_data; num∫tol)
+                           maxiter=50, kwargs...)
+    H2_data = extract_ref_data(basis, datadir)
+    model = setup_optim_model(H2_data; kwargs...)
     set_optimizer_attribute(model, "max_iter", maxiter)
     optimize!(model)
     model
