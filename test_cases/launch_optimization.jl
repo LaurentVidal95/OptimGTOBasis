@@ -1,9 +1,6 @@
 using OptimAOsDiatomic
 import OptimAOsDiatomic as OAO
 using JuMP
-using PyCall
-
-# Optimization
 using Ipopt
 
 datadir=joinpath(splitpath(pathof(OptimAOsDiatomic))[1:end-3]...,"data/H2")
@@ -29,6 +26,7 @@ H2_mol(basis::String, R; symmetry=false) =
         symmetry,
         unit="bohr",
     )
+
 LiH_mol(basis::String, R; symmetry=false) =
     OAO.pyscf.M(;
         atom = "H 0.0 0.0 0.0;

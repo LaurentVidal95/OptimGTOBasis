@@ -74,7 +74,18 @@ end
 """
 Setup the optimization problem using JuMP framework.
 """
-function setup_optim_model(ref_data; num∫tol=1e-7)
+function setup_optim_model(ref_data; criterion=:energy, kwargs...)
+    @assert criterion ∈ [:energy, :density] "Choose between energy and density criterion"
+    if criterion == :energy
+        return setup_optim_model_energy(ref_data; kwargs...)
+    else
+        return setup_optim_model_density(ref_data; kwargs...)
+    end
+    nothing
+end
+
+function setup_optim_model_density(ref_data; num∫tol=1e-7)
+    @info "Setup model for density criterion"
     model = Model(Ipopt.Optimizer)
 
     # Compute maximum spread and setup constrained variables
@@ -88,16 +99,35 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
     n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
     
     # Define and register objective function 
-    # function j2opt(X::T...) where {T<:Real}
-    #     Y = collect(X)
-    #     accu = zero(T)
-    #     for (i, Rh) in enumerate(ref_data.Rhs)
-    #         # accu += j_L2_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i],
-    #         #                       ref_data.grids[i])
-    #         accu += j_E_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Energies[i])
-    #     end
-    #     accu
-    # end
+    function j2opt(X::T...) where {T<:Real}
+        Y = collect(X)
+        accu = zero(T)
+        for (i, Rh) in enumerate(ref_data.Rhs)
+            accu += j_L2_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i],
+                                  ref_data.grids[i])
+        end
+        accu
+    end
+    register(model, :j2opt, n_params, j2opt; autodiff=true)
+    X = model[:X]
+    @NLobjective(model, Min, j2opt(X...))
+    model
+end
+
+function setup_optim_model_energy(ref_data; max_spread=200)
+    @info "Setup model for energy criterion"
+
+    model = Model(Ipopt.Optimizer)
+
+    # Compute maximum spread and setup constrained variables
+    ζ_max = max_spread
+    @info "Maximum spread for given integration grids: $(ζ_max)"
+    setup_bounds!(model, ref_data, ζ_max)
+
+    # Extract elements and handle the A=B case.
+    A, B = ref_data.Elements
+    n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
+    
     function j2opt(X::T...) where {T<:Real}
         Y = collect(X)
         sum([j_E_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], E)
@@ -114,7 +144,7 @@ function setup_optim_model(ref_data; num∫tol=1e-7)
         end
         return nothing
     end
-    register(model, :j2opt, n_params, j2opt, ∇j2opt!) #; autodiff=true)
+    register(model, :j2opt, n_params, j2opt, ∇j2opt!)
     X = model[:X]
     @NLobjective(model, Min, j2opt(X...))
     model
