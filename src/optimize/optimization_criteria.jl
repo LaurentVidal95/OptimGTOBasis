@@ -18,12 +18,6 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
 
     # Compute the projection of ΨA on the AO basis
     S = dot(grid, 𝐗, 𝐗)
-    # # Debug
-    # if eltype(𝐗) ≠ T2
-    # #     @show cond(S).value
-    # #     @show criterion.value
-    #     S = [x.value for x in S]
-    # end
     Γ = dot(grid, 𝐗, Ψ_ref)
     C = inv(Symmetric(S))*Γ  # projection coefficients
 

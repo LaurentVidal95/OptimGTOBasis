@@ -52,7 +52,5 @@ include("optimize/setup_optim.jl")
 export generate_basis_file
 include("external/helfem.jl")
 include("external/pyscf.jl")
-# Small useful routines
-include("utils.jl")
 
 end # module

@@ -43,7 +43,7 @@ end
 
 """
 Assert that the integration error over the given grid is lower
- that machine (double) precision
+than machine (double) precision
 """
 function test_spread(grid::QuadGrid{T}, ζ, Rh::T; num∫tol) where {T<:Real}
     g(X) = (π/ζ)^(-3/2)*exp(-ζ*norm(X .- [0,0,Rh])^2)
