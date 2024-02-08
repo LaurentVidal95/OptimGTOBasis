@@ -1,5 +1,29 @@
 using GenericLinearAlgebra
 
+abstract type OptimizationCriterion end
+
+"""
+Optimize the distance between approach density and a reference
+density ρ_ref on a discretization grid.
+"""
+struct ProjectionCriterion <: OptimizationCriterion
+    reference_functions   ::Vector{Matrix}
+    grids                 ::Vector{QuadGrid}
+    gridtol               ::Float64
+    interactomic_distance ::AbstractVector
+end
+ProjectionCriterion(ref_data; gridtol=1e-7) =
+    ProjectionCriterion(ref_data.Ψs_ref, ref_data.grids,  gridtol, (ref_data.Rhs .*2))
+
+function objective_function(criterion::ProjectionCriterion, A₀::Element, B₀::Element, X::T...) where {T<:Real}
+    Y = collect(X)
+    J_Rhs = map(enumerate(criterion.interatomic_distances)) do (i, Rh)
+        j_L2_diatomic(Y, A₀, B₀, [0., 0., -Rh/2], [0., 0., Rh/2],
+        criterion.reference_functions[i], criterion.grids[i])
+    end
+    sum(J_Rhs)
+end
+
 """
 For now just handles L2 projection.
 Since ΨA and ΨB are equal for the current test casses I only put
@@ -14,12 +38,15 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
                AO_basis(B; position=RB, grid.mmax, verbose=false))
     normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
     # TODO: speedup
-    𝐗 = normalize_col(eval_AOs(grid, AOs))
+    C = eval_AOs(grid, AOs)
+    Ω = diagm(grid.weights)
+    S = dot(grid, C, C)
+    Sm12 = inv(sqrt(Symmetric(S)))
+    C⁰ = C*Sm12 # AOs on the grid in orthonormal convention
+    Π = C⁰*(C⁰')*Ω
 
     # Compute the projection of ΨA on the AO basis
-    S = dot(grid, 𝐗, 𝐗)
-    Γ = dot(grid, 𝐗, Ψ_ref)
-    C = inv(Symmetric(S))*Γ  # projection coefficients
+    criterion = sum(-Ψ_ref_i'*P*Ω*Ψ_ref_i for Ψ_ref_i in eachcol(Ψ_ref))
 
     # Return sum of distances
     criterion = sum(norm(Ψ_ref_i - 𝐗*Ci)^2 for (Ψ_ref_i, Ci) in zip(eachcol(Ψ_ref), eachcol(C)))
@@ -38,11 +65,36 @@ function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
     j_L2_diatomic(A, B, RA, RB, Ψ_ref, grid)
 end
 
-function j_E_diatomic(A::Element{T1}, B::Element{T1},
-                      RA::Vector{T2},  RB::Vector{T2},
-                      e_tot_ref::T3) where {T1,T2,T3 <: Real}
-    atom = "$(A.name) $(RA[1]) $(RA[2]) $(RA[3]);
-            $(B.name) $(RB[1]) $(RB[2]) $(RB[3])"
+struct EnergyCriterion{T<:Real} <: OptimizationCriterion
+    reference_energies::Vector{T}
+    interatomic_distances::Vector{T}
+end
+EnergyCriterion(ref_data; kwargs...) = EnergyCriterion(ref_data.Energies, (ref_data.Rhs .*2))
+
+function objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Element, X::T...) where {T<:Real}
+    Y = collect(X)
+    # Compute criterion
+    J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, Rh)
+        j_E_diatomic(Y, A₀, B₀, Rh/2, E)
+    end
+    sum(J_Rhs)
+end
+function grad_objective_function!(criterion::EnergyCriterion, A₀::Element, B₀::Element, ∇J, X::T...) where {T<:Real}
+    Y = collect(X)
+    ∇Y = zero(Y)
+    for (E, Rh) in zip(criterion.reference_energies, criterion.interatomic_distances)
+            ∇Y .+= ∇j_E_diatomic(Y, A₀, B₀, Rh/2, E)
+        end
+    for i in 1:length(Y)
+        ∇J[i] = ∇Y[i]
+    end
+    return nothing
+end
+
+function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
+    e_ref::T3) where {T1,T2,T3 <: Real}
+    atom = "$(A.name) $(zero(Rh)) $(zero(Rh)) $(-Rh);
+            $(B.name) $(zero(Rh)) $(zero(Rh)) $(Rh)"
     basis = A==B ? basis_string([A]) : basis_string([A,B])
     # Run pyscf
     mol = pyscf.M(;atom, basis,
@@ -51,12 +103,10 @@ function j_E_diatomic(A::Element{T1}, B::Element{T1},
                   verbose=0,
                   )
     rhf_ground_state = mol.RHF().run()
-    e_tot = rhf_ground_state.e_tot
-    abs(e_tot - e_tot_ref)^2
+    abs(rhf_ground_state.e_tot - e_ref)^2
 end
 function j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
-                      RA::Vector{T2},  RB::Vector{T2},
-                      e_tot_ref::T3) where {T1,T2,T3 <: Real}
+                      Rh::T2, e_ref::T3) where {T1,T2,T3 <: Real}
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
     XA, XB = (length(X)==nA) ? (X, X) : (X[1:nA], X[nA+1:end])
@@ -64,19 +114,18 @@ function j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
     B = (length(X)==nA) ? A : Element(XB, B₀)
 
     # return j to minimize
-    j_E_diatomic(A, B, RA, RB, e_tot_ref)
+    j_E_diatomic(A, B, Rh, e_ref)
 end
 function ∇j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
-                       RA::Vector{T2},  RB::Vector{T2},
-                       e_tot_ref::T3) where {T1,T2,T3 <: Real}
+                       Rh::T2, e_ref::T3) where {T1,T2,T3 <: Real}
     ∇j = []
     len_X = length(X)
     h = 1e-4
     for i in 1:len_X
         Xᵢph = X .+ [zeros(i-1)..., (h/2), zeros(len_X-i)...]
         Xᵢmh = X .- [zeros(i-1)..., (h/2), zeros(len_X-i)...]
-        ∂i_j = (1/h)*(j_E_diatomic(Xᵢph, A₀, B₀, RA, RB, e_tot_ref) -
-                      j_E_diatomic(Xᵢmh, A₀, B₀, RA, RB, e_tot_ref))
+        ∂i_j = (1/h)*(j_E_diatomic(Xᵢph, A₀, B₀, Rh, e_ref) -
+                      j_E_diatomic(Xᵢmh, A₀, B₀, Rh, e_ref))
         push!(∇j, ∂i_j)
     end
     ∇j

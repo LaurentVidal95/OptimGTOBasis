@@ -15,7 +15,6 @@ end
 (Rnl::RadialPart)(X) = Rnl.coeffs'exp.(map(ζ -> -ζ*norm(X)^2, Rnl.exps))
 
 """
-
     struct AO(Rnl, Ylm, center)
 
 Generic atomic orbital (AO) basis function ``AO(X) = Y_{lm}(X)R_{nl}(X)``.

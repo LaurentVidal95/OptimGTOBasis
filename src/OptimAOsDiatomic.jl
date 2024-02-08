@@ -16,11 +16,6 @@ function __init__()
     copy!(pyscf, pyimport("pyscf"))
 end
 
-# # DEBUG
-# using LegendrePolynomials
-# using Optim
-#
-
 # numerical integration
 export QuadGrid
 export default_spread_lim
@@ -41,6 +36,8 @@ export reference_eigenvectors
 export extract_ref_data
 
 # Construct and solve optimization problem
+export ProjectionCriterion
+export EnergyCriterion
 export j_L2_diatomic           # optimize ||Ψ_ref - proj(Ψ_ref)||_L²
 export j_E_diatomic            # optimize ||E(X) - E_ref||^2
 export setup_bounds!

@@ -20,7 +20,7 @@ function extract_ref_data(basis::String, files::Vector{String})
     Rhs = []
     Ψs_ref = []
     grids = QuadGrid[]
-    Energies = []
+    Energies = Float64[]
     normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
 
     # Run through all JSON file. Only interatomic distance Rh changes for each file.
@@ -78,82 +78,37 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T;
     nothing
 end
 
-"""
-Setup the optimization problem using JuMP framework.
-"""
-function setup_optim_model(ref_data; criterion=:energy, kwargs...)
-    @assert criterion ∈ [:energy, :density] "Choose between energy and density criterion"
-    if criterion == :energy
-        return setup_optim_model_energy(ref_data; kwargs...)
+function maximum_spread(ref_data, criterion::OptimizationCriterion; default_max_spread=200)
+    isa(criterion, EnergyCriterion) && (return default_max_spread)
+    findmin([compute_spread_lim(grid, Rh; criterion.gridtol) for (grid, Rh) in
+             zip(criterion.grids, (1/2) .* criterion.interatomic_distances)])[1]
+end
+
+function setup_optim_model(ref_data, criterion::OptimizationCriterion;
+                           X_start=default_starting_point(ref_data))
+    @assert Bool(sum(isa.(Ref(criterion), [ProjectionCriterion, EnergyCriterion]))) ""*
+        "Choose between energy and density criterion"
+
+    criterion_type = typeof(criterion)==ProjectionCriterion ? :projection : :energy
+    @info "Setup model for the $(criterion_type) criterion"
+    model = Model(Ipopt.Optimizer)
+
+    # Setup constrained variables
+    ζ_max = maximum_spread(ref_data, criterion)
+    @info "Maximum spread: $(ζ_max)"
+    setup_bounds!(model, ref_data, ζ_max; X_start)
+
+    # Extract elements and handle the A=B case.
+    A, B = ref_data.Elements
+    n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
+
+    j2opt(X::T...) where {T<:Real} = objective_function(criterion, A, B, X...)
+    if isa(criterion, ProjectionCriterion)
+        register(model, :j2opt, n_params, j2opt; autodiff=true)
     else
-        return setup_optim_model_density(ref_data; kwargs...)
+        ∇j2opt!(∇J, X::T...) where {T<:Real} = grad_objective_function!(criterion, A, B, ∇J, X...)
+        register(model, :j2opt, n_params, j2opt, ∇j2opt!)
     end
-    nothing
-end
-
-function setup_optim_model_density(ref_data; num∫tol=1e-7,
-                                   X_start=default_starting_point(ref_data))
-    @info "Setup model for density criterion"
-    model = Model(Ipopt.Optimizer)
-
-    # Compute maximum spread and setup constrained variables
-    ζ_max = findmin([compute_spread_lim(grid, Rh; num∫tol)
-                     for (grid, Rh) in zip(ref_data.grids, ref_data.Rhs)])[1]
-    @info "Maximum possible spread for given integration grids: $(ζ_max)"
-    setup_bounds!(model, ref_data, ζ_max; X_start)
-
-    # Extract elements and handle the A=B case.
-    A, B = ref_data.Elements
-    n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
-
-    # Define and register objective function
-    function j2opt(X::T...) where {T<:Real}
-        Y = collect(X)
-        accu = zero(T)
-        for (i, Rh) in enumerate(ref_data.Rhs)
-            accu += j_L2_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Ψs_ref[i],
-                                  ref_data.grids[i])
-        end
-        accu
-    end
-    register(model, :j2opt, n_params, j2opt; autodiff=true)
-    X = model[:X]
-    @NLobjective(model, Min, j2opt(X...))
-    model
-end
-
-function setup_optim_model_energy(ref_data; max_spread=200,
-                                  X_start=default_starting_point(ref_data))
-    @info "Setup model for energy criterion"
-
-    model = Model(Ipopt.Optimizer)
-
-    # Compute maximum spread and setup constrained variables
-    ζ_max = max_spread
-    @info "Maximum spread for given integration grids: $(ζ_max)"
-    setup_bounds!(model, ref_data, ζ_max; X_start)
-
-    # Extract elements and handle the A=B case.
-    A, B = ref_data.Elements
-    n_params = A==B ? length(vec(A)) : length(vec(A)) + length(vec(B))
-
-    function j2opt(X::T...) where {T<:Real}
-        Y = collect(X)
-        sum([j_E_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], E)
-                         for (Rh, E) in zip(ref_data.Rhs, ref_data.Energies)])
-    end
-    function ∇j2opt!(∇J, X::T...) where {T<:Real}
-        Y = collect(X)
-        ∇Y = zero(Y)
-        for (i, Rh) in enumerate(ref_data.Rhs)
-            ∇Y .+= ∇j_E_diatomic(Y, A, B, [0., 0., -Rh], [0., 0., Rh], ref_data.Energies[i])
-        end
-        for i in 1:length(Y)
-            ∇J[i] = ∇Y[i]
-        end
-        return nothing
-    end
-    register(model, :j2opt, n_params, j2opt, ∇j2opt!)
     X = model[:X]
     @NLobjective(model, Min, j2opt(X...))
     model

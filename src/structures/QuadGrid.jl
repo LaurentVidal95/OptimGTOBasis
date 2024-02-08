@@ -9,7 +9,7 @@ struct QuadGrid{T<:Real}
     # maximum quantum number m that can be integrated
     # Integrating spherical harmonics with |m| > mmax
     # might result in uncontrolled errors.
-    mmax    ::Int64                    
+    mmax    ::Int64
 end
 
 """
@@ -45,19 +45,19 @@ end
 Assert that the integration error over the given grid is lower
 than machine (double) precision
 """
-function test_spread(grid::QuadGrid{T}, ζ, Rh::T; num∫tol) where {T<:Real}
+function test_spread(grid::QuadGrid{T}, ζ, Rh::T; gridtol) where {T<:Real}
     g(X) = (π/ζ)^(-3/2)*exp(-ζ*norm(X .- [0,0,Rh])^2)
     ∫g = sum(grid.weights .* g.(grid.points))
-    return abs(1 - ∫g) < num∫tol
+    return abs(1 - ∫g) < gridtol
 end
 
 """
 Computes within 5 units the maximum ζ that can be integrated on the integration grid
-with maximum error num∫tol.
+with maximum error gridtol.
 """
-function compute_spread_lim(grid::QuadGrid{T}, Rh::T; num∫tol) where {T<:Real}
+function compute_spread_lim(grid::QuadGrid{T}, Rh::T; gridtol) where {T<:Real}
     spread_lim = 20
-    while test_spread(grid, spread_lim, Rh; num∫tol)
+    while test_spread(grid, spread_lim, Rh; gridtol)
         spread_lim += 5
     end
     spread_lim
