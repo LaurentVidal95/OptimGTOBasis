@@ -10,7 +10,7 @@ struct ProjectionCriterion <: OptimizationCriterion
     reference_functions   ::Vector{Matrix}
     grids                 ::Vector{QuadGrid}
     gridtol               ::Float64
-    interactomic_distance ::AbstractVector
+    interatomic_distances ::AbstractVector
 end
 ProjectionCriterion(ref_data; gridtol=1e-7) =
     ProjectionCriterion(ref_data.Ψs_ref, ref_data.grids,  gridtol, (ref_data.Rhs .*2))
@@ -21,7 +21,7 @@ function objective_function(criterion::ProjectionCriterion, A₀::Element, B₀:
         j_L2_diatomic(Y, A₀, B₀, [0., 0., -Rh/2], [0., 0., Rh/2],
         criterion.reference_functions[i], criterion.grids[i])
     end
-    sum(J_Rhs)
+    sum(J_Rhs) / length(criterion.interatomic_distances)
 end
 
 """
@@ -36,21 +36,15 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
     # Construct the AO_basis and eval on the integration grid
     AOs = vcat(AO_basis(A; position=RA, grid.mmax, verbose=false),
                AO_basis(B; position=RB, grid.mmax, verbose=false))
-    normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
-    # TODO: speedup
+    # normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
     C = eval_AOs(grid, AOs)
-    Ω = diagm(grid.weights)
     S = dot(grid, C, C)
     Sm12 = inv(sqrt(Symmetric(S)))
     C⁰ = C*Sm12 # AOs on the grid in orthonormal convention
-    Π = C⁰*(C⁰')*Ω
 
-    # Compute the projection of ΨA on the AO basis
-    criterion = sum(-Ψ_ref_i'*P*Ω*Ψ_ref_i for Ψ_ref_i in eachcol(Ψ_ref))
-
-    # Return sum of distances
-    criterion = sum(norm(Ψ_ref_i - 𝐗*Ci)^2 for (Ψ_ref_i, Ci) in zip(eachcol(Ψ_ref), eachcol(C)))
-    criterion # + 1e-5*cond(S)
+    # Compute projection
+    Π_half = dot(grid, C⁰, Ψ_ref)
+    sum(1 .- Π_half'Π_half)
 end
 function j_L2_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                        RA::Vector{T2},  RB::Vector{T2},
@@ -77,7 +71,7 @@ function objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Ele
     J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, Rh)
         j_E_diatomic(Y, A₀, B₀, Rh/2, E)
     end
-    sum(J_Rhs)
+    sum(J_Rhs) / length(criterion.reference_energies)
 end
 function grad_objective_function!(criterion::EnergyCriterion, A₀::Element, B₀::Element, ∇J, X::T...) where {T<:Real}
     Y = collect(X)

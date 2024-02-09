@@ -33,9 +33,16 @@ function extract_ref_data(basis::String, files::Vector{String})
                 Elements = [A,B]
                 output_data = merge(output_data, (;Elements))
             end
+            # Extracta and normalize reference eigenfunctions
+            grid = QuadGrid(data)
+            Ψs = reference_eigenvectors(data)[1]
+            @assert(norm(imag.(Ψs)) < 1e-10) # Check that the functions are real
+            grid_norm = sqrt.(diag(dot(grid, Ψs, Ψs)))
+            Ψs = real.((1 ./ grid_norm)' .* Ψs)
+
             push!(Rhs, data["Rh"])
-            push!(Ψs_ref, normalize_col(reference_eigenvectors(data)[1]))
-            push!(grids, QuadGrid(data))
+            push!(grids, grid)
+            push!(Ψs_ref, Ψs)
             push!(Energies, data["Total energy"])
         end
     end
@@ -70,10 +77,10 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T;
     @variable(model, X[i=1:n_params], start=X_start[i])
     # Defined boxed constraints with JuMP conventions
     @constraint(model, [i=1:n_ζA],  exps_tol ≤     X[i]    ≤ ζ_max, base_name="spread_A")
-    @constraint(model, [i=1:nA-n_ζA], -c_max ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
+    @constraint(model, [i=1:nA-n_ζA], zero(c_max) ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
     if !(A==B)
         @constraint(model, [i=1:n_ζB],  exps_tol ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
-        @constraint(model, [i=1:nB-n_ζB], -c_max ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
+        @constraint(model, [i=1:nB-n_ζB], zero(c_max) ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
     end
     nothing
 end
