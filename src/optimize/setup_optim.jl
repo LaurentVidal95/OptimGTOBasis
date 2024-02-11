@@ -11,7 +11,10 @@ end
 function extract_ref_data(basis::String, datadir::String)
     # Extract raw data
     @assert(isdir(datadir))
-    files = joinpath.(Ref(datadir), readdir(datadir))
+    files = joinpath.(Ref(datadir), filter(x->!startswith(x, "_"), readdir(datadir)))
+    for file in files
+        @info "reading $(file)"
+    end
     extract_ref_data(basis, files)
 end
 function extract_ref_data(basis::String, files::Vector{String})
@@ -77,10 +80,10 @@ function setup_bounds!(model::Model, ref_data, ζ_max::T;
     @variable(model, X[i=1:n_params], start=X_start[i])
     # Defined boxed constraints with JuMP conventions
     @constraint(model, [i=1:n_ζA],  exps_tol ≤     X[i]    ≤ ζ_max, base_name="spread_A")
-    @constraint(model, [i=1:nA-n_ζA], zero(c_max) ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
+    @constraint(model, [i=1:nA-n_ζA], -c_max ≤  X[i+n_ζA]  ≤ c_max, base_name="ctr_A")
     if !(A==B)
         @constraint(model, [i=1:n_ζB],  exps_tol ≤   X[nA+i]   ≤ ζ_max, base_name="spread_B")
-        @constraint(model, [i=1:nB-n_ζB], zero(c_max) ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
+        @constraint(model, [i=1:nB-n_ζB], -c_max ≤ X[nA+n_ζB+i] ≤ c_max, base_name="ctr_B")
     end
     nothing
 end

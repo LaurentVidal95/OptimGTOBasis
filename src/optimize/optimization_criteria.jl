@@ -17,6 +17,10 @@ ProjectionCriterion(ref_data; gridtol=1e-7) =
 
 function objective_function(criterion::ProjectionCriterion, A₀::Element, B₀::Element, X::T...) where {T<:Real}
     Y = collect(X)
+    if norm(Y) > 1e3
+        foo = eltype(Y)==Float64 ? Y : map(x->x.value, Y)
+        @info "High trial point norm: $(foo)"
+    end
     J_Rhs = map(enumerate(criterion.interatomic_distances)) do (i, Rh)
         j_L2_diatomic(Y, A₀, B₀, [0., 0., -Rh/2], [0., 0., Rh/2],
         criterion.reference_functions[i], criterion.grids[i])
@@ -39,6 +43,11 @@ function j_L2_diatomic(A::Element{T1}, B::Element{T1},
     # normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
     C = eval_AOs(grid, AOs)
     S = dot(grid, C, C)
+    if cond(S) > 1e5 # Debug
+        foo = cond(S)
+        bar = typeof(foo)==Float64 ? foo : foo.value
+        @warn "Overlap conditioning: $(bar)"
+    end
     Sm12 = inv(sqrt(Symmetric(S)))
     C⁰ = C*Sm12 # AOs on the grid in orthonormal convention
 
