@@ -91,7 +91,13 @@ function grad_objective_function!(criterion::EnergyCriterion, A₀::Element, B�
     for i in 1:length(Y)
         ∇J[i] = ∇Y[i]
     end
-    return nothing
+    return ∇Y
+end
+function grad_objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Element, X::T...) where {T<:Real}
+    Y = collect(X)
+    ∇Y = zero(Y)
+    grad_objective_function!(criterion, A₀, B₀, X...)
+    return ∇Y
 end
 
 function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
