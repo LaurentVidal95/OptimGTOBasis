@@ -35,8 +35,8 @@ function dissociation_curve(mol::F, basis::String, basis_opt::String, distances:
     end
     output["bond lengths"] = distances
     output["basis"] = basis
+    output["basis_opt"] = basis_opt
     output["Samples"] = samples
-
     open(io->JSON3.write(io, output, allow_inf=true), output_file, "w")
     output_file
 end
