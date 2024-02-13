@@ -5,6 +5,12 @@ function reference_eigenvectors(data::Dict{String, Any})
     ΨA, ΨB
 end
 
+function reference_kinetic(data::Dict{String, Any})
+    TΨA = data["Torba.re"] .+ im .* data["Torba.im"]
+    TΨB = data["Torbb.re"] .+ im .* data["Torbb.im"]
+    TΨA, TΨB
+end
+
 function extract_ref_data(basis::String, datadir::String)
     # Extract raw data
     @assert(isdir(datadir))
@@ -17,13 +23,13 @@ end
 function extract_ref_data(basis::String, files::Vector{String})
     # Extract raw data
     output_data = (;)
-    Rhs = []
+    Rhs = Float64[]
     Ψs_ref = []
+    TΨs_ref = []
     grids = QuadGrid[]
     Energies = Float64[]
-    normalize_col(tab) = hcat(normalize.(eachcol(tab))...)
 
-    # Run through all JSON file. Only interatomic distance Rh changes for each file.
+    # Run through all JSON file.
     for filename in files # joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
             data = read(file)
@@ -35,11 +41,22 @@ function extract_ref_data(basis::String, files::Vector{String})
             end
             # Extracta and normalize reference eigenfunctions
             grid = QuadGrid(data)
+            # DEBUG: Only alpha here....
             Ψs = reference_eigenvectors(data)[1]
-            @assert(norm(imag.(Ψs)) < 1e-10) # Check that the functions are real
-            grid_norm = sqrt.(diag(dot(grid, Ψs, Ψs)))
-            Ψs = real.((1 ./ grid_norm)' .* Ψs)
+            TΨs = reference_kinetic(data)[1]
+            # Sanity checks
+            # Check that the functions are real
+            @assert(norm(imag.(Ψs)) < 1e-10) 
+            @assert(norm(imag.(TΨs)) < 1e-10)
+            Ψs = real.(Ψs)
+            TΨs = real.(TΨs)
+            # Check that Ψs are orthonormal and check kinetic term precision
+            @assert norm(dot(grid, Ψs, Ψs) - I) < 1e-8 ""*
+                "Reference eigenfunctions are not orthonormal"
+            @assert norm(sum(2*dot(grid, Ψs, TΨs)) - data["Kinetic energy"]) < 1e-6
 
+            # Add data to reference dict
+            push!(TΨs_ref, TΨs)
             push!(Rhs, data["Rh"])
             push!(grids, grid)
             push!(Ψs_ref, Ψs)
@@ -48,7 +65,7 @@ function extract_ref_data(basis::String, files::Vector{String})
     end
 
     # Return all data as a NamedTuple
-    merge(output_data, (; Rhs, Ψs_ref, grids, basis, Energies))
+    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies))
 end
 
 function set_starting_point(ref_data; guess=:bse)

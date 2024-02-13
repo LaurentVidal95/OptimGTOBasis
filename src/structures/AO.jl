@@ -64,5 +64,16 @@ function AO_basis(X::Element{T};
     end
     AOs 
 end
+
+function H¹_overlap(X::Element{T}, R; kwargs...) where {T<:Real}
+    basis = Dict([X.name => basis_string([X])])
+    tmp_mol = pyscf.M(;atom="$(X.name) 0.0 0.0 0.0;
+                             $(X.name) 0.0 0.0 $R",
+                      basis,
+                      kwargs...
+                      )
+    2*tmp_mol.intor("int1e_kin")
+end
+
 eval_AO(grid::QuadGrid, AO::AO) = ThreadsX.map(x->AO(x), grid.points)
 eval_AOs(grid::QuadGrid, AOs::Vector{AO}) = hcat(ThreadsX.map(Χμ->eval_AO(grid,Χμ), AOs)...)
