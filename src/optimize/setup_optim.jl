@@ -88,12 +88,11 @@ function launch_Optim(ref_data, criterion::OptimizationCriterion, X_guess;
     f(X) = objective_function(criterion, A, B, X...)
     g!(∇E, X) = grad_objective_function!(criterion, A, B, ∇E, X...)
     # Choose between energy and projection criterion
-    if isa(criterion, EnergyCriterion)
+    if false #isa(criterion, EnergyCriterion)
         return optimize(f, g!, X_guess, solver,
                         Optim.Options(show_trace=true, iterations=maxiter))
     else
-        return optimize(f, X_guess, solver, Optim.Options(show_trace=true, iterations=maxiter),
-                        autodiff=:forward)
+        return optimize(f, X_guess, solver, Optim.Options(show_trace=true, iterations=maxiter))
     end
     error("Not supposed to happen")
 end

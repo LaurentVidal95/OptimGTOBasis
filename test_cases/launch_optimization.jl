@@ -6,11 +6,11 @@ datadir=joinpath(splitpath(pathof(OptimAOsDiatomic))[1:end-3]...,"data/H2")
 function optimize_AO_basis(basis::String, datadir::String, criterion_type;
                            optimizer=:Optim, # Choose between Optim.jl and JuMP (Ipopt)
                            maxiter=50,
-                           gridtol=1e-9,
+                           norm_type=:L²,
                            guess=:bse,
                            kwargs...)
     ref_data = extract_ref_data(basis, datadir)
-    criterion = criterion_type(ref_data; gridtol)
+    criterion = criterion_type(ref_data; norm_type)
     X_guess = OAO.set_starting_point(ref_data; guess)
 
     if (optimizer==:Ipopt)
