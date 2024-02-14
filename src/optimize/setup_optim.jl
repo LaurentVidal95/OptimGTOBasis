@@ -73,8 +73,19 @@ function set_starting_point(ref_data; guess=:bse)
     A, B = ref_data.Elements
     n_params = A==B ? length(vec(A)) : sum(length.(vec(A), vec(B)))
     if guess==:bse
-        (A==B) && return vec(A)
-        return vcat(vec(A), vec(B))
+        if (A==B)
+            X_guess = vec(A)
+            n_exps = len_exps(A)
+            X_guess[1:n_exps] = log.(X_guess[1:n_exps])
+            return X_guess
+        else
+            n_exps = len_exps.([A,B])
+            XA_guess = vec(A)
+            XB_guess = vec(B)
+            XA_guess[1:n_exps[1]] .= log.(XA_guess[1:n_exps[1]])
+            XB_guess[1:n_exps[1]] .= log.(XB_guess[1:n_exps[1]])
+            vcat(XA_guess, XB_guess)
+        end
     else
         return rand(n_params)
     end

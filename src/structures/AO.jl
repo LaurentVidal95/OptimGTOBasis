@@ -18,7 +18,7 @@ function eval_abs_ms(mol::PyObject)
             append!(abs_ms, [1,1,0])
         else # l=d,f,g,...
             # Compute numbers of aos with same n and l
-            half_n_ao_nl = div(length(aos_nl), 2)            
+            half_n_ao_nl = div(length(aos_nl), 2)
             append!(abs_ms, abs.(collect(-half_n_ao_nl:half_n_ao_nl)))
         end
     end
@@ -37,6 +37,7 @@ function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
     # filter X with mmax: X[:,i]=0 if |m(X[:,i])| > mmax
     id_selected_aos = [i for (i,m) in enumerate(eval_abs_ms(tmp_mol)) if m≤grid.mmax]
     X[:,id_selected_aos]
+
 end
 
 function overlap(grid::QuadGrid, X::Element{T}, R; norm_type=:L²) where {T<:Real}

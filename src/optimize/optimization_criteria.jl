@@ -26,22 +26,6 @@ function Base.show(io::IO, crit::ProjectionCriterion)
     println(io, "Projection criterion for the $(crit.norm_type) norm")
 end
 
-function objective_function(criterion::ProjectionCriterion, A₀::Element,
-                            B₀::Element, X::T...) where {T<:Real}
-    Y = collect(X)
-    if norm(Y) > 1e3
-        foo = eltype(Y)==Float64 ? Y : map(x->x.value, Y)
-        @info "High trial point norm: $(foo)"
-    end
-    J_Rhs = map(enumerate(criterion.interatomic_distances)) do (i, R)
-        j_proj_diatomic(Y, A₀, B₀, R,
-                      criterion.reference_functions[i], criterion.reference_kinetics[i],
-                      criterion.grids[i];
-                      criterion.norm_type)
-    end
-    sum(J_Rhs) / length(criterion.interatomic_distances)
-end
-
 """
 Since ΨA and ΨB are equal for the current test casses I only put
 Ψ_ref instead of ΨA, ΨB as argument.
@@ -59,14 +43,17 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     (norm_type==:H¹) && (Ψ_norm += 2*dot(grid, Ψ, TΨ))
     # Sanity check on the overlap
     if cond(M) > 1e5
-        foo = cond(M)
-        bar = typeof(foo)==Float64 ? foo : foo.value
-        @warn "Overlap conditioning: $(bar)"
+        foo = eltype(M)==Float64 ? vec(A) : map(x->x.value, vec(A))
+        bar = eltype(M)==Float64 ? M : map(x->x.value, M)
+        @show foo
+        @show bar
+        @warn "Overlap conditioning: $(cond(foo))"
     end
     Mm12 = inv(sqrt(Symmetric(M)))
     C⁰ = C*Mm12
 
     # Compute projection
+    Π = zero(Ψ_norm)
     begin
         (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
         (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
@@ -95,34 +82,6 @@ struct EnergyCriterion{T<:Real} <: OptimizationCriterion
 end
 EnergyCriterion(ref_data; kwargs...) =
     EnergyCriterion(ref_data.Energies, (ref_data.Rhs .*2))
-
-function objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Element, X::T...) where {T<:Real}
-    Y = collect(X)
-    # Compute criterion
-    J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, Rh)
-        j_E_diatomic(Y, A₀, B₀, Rh/2, E)
-    end
-    sum(J_Rhs) / length(criterion.reference_energies)
-end
-function grad_objective_function!(criterion::EnergyCriterion, A₀::Element, B₀::Element,
-                                  ∇J, X::T...) where {T<:Real}
-    Y = collect(X)
-    ∇Y = zero(Y)
-    for (E, R) in zip(criterion.reference_energies, criterion.interatomic_distances)
-            ∇Y .+= ∇j_E_diatomic(Y, A₀, B₀, R/2, E)
-        end
-    for i in 1:length(Y)
-        ∇J[i] = ∇Y[i]
-    end
-    return ∇Y
-end
-function grad_objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Element,
-                                 X::T...) where {T<:Real}
-    Y = collect(X)
-    ∇Y = zero(Y)
-    grad_objective_function!(criterion, A₀, B₀, ∇Y, X...)
-    return ∇Y
-end
 
 function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
     e_ref::T3) where {T1,T2,T3 <: Real}
@@ -162,4 +121,39 @@ function ∇j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
         push!(∇j, ∂i_j)
     end
     ∇j
+end
+
+
+function objective_function(criterion::ProjectionCriterion, A₀::Element,
+                            B₀::Element, X::T...) where {T<:Real}
+    Y = collect(X)
+
+    # log optimization to ensure that the exponents are positive
+    n_exps = len_exps(A₀)
+    Y[1:n_exps] .= exp.(Y[1:n_exps])
+
+    if norm(Y) > 1e3
+        foo = eltype(Y)==Float64 ? Y : map(x->x.value, Y)
+        @info "High trial point norm: $(foo)"
+    end
+    J_Rhs = map(enumerate(criterion.interatomic_distances)) do (i, R)
+        j_proj_diatomic(Y, A₀, B₀, R,
+                      criterion.reference_functions[i], criterion.reference_kinetics[i],
+                      criterion.grids[i];
+                      criterion.norm_type)
+    end
+    sum(J_Rhs) / length(criterion.interatomic_distances)
+end
+
+function objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Element,
+                            X::T...) where {T<:Real}
+    Y = collect(X)
+    n_exps = len_exps(A₀)
+    Y[1:n_exps] .= exp.(Y[1:n_exps])
+
+    # Compute criterion
+    J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, Rh)
+        j_E_diatomic(Y, A₀, B₀, Rh/2, E)
+    end
+    sum(J_Rhs) / length(criterion.reference_energies)
 end

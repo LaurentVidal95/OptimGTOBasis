@@ -33,6 +33,8 @@ function vec(X::Element{T}) where {T<:Real}
     vcat(exps, coeffs)
 end
 
+len_exps(X::Element{T}) where {T<:Real} = length(vcat([shell.exps for shell in X.shells]...))
+
 # vector -> shells
 # The ForwardDiff type T1 has to be different from T2
 function Element(X_vec::Vector{T1}, X_ref::Element{T2}) where {T1, T2 <:Real}
