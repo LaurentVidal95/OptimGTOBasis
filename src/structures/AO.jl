@@ -29,8 +29,8 @@ function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
                   R::T2) where {T1, T2<:Real}
     basis = Dict([A.name => basis_string([A]),
                   B.name => basis_string([B])])
-    tmp_mol = pyscf.M(;atom="$(A.name) 0.0 0.0 0.0;
-                             $(B.name) 0.0 0.0 $R",
+    tmp_mol = pyscf.M(;atom="$(A.name) 0.0 0.0 -$(R/2);
+                             $(B.name) 0.0 0.0 $(R/2)",
                       basis
                       )
     X = pyscf.dft.numint.eval_ao(tmp_mol, grid.points)
@@ -42,8 +42,8 @@ end
 
 function overlap(grid::QuadGrid, X::Element{T}, R; norm_type=:L²) where {T<:Real}
     basis = Dict([X.name => basis_string([X])])
-    tmp_mol = pyscf.M(;atom="$(X.name) 0.0 0.0 0.0;
-                             $(X.name) 0.0 0.0 $R",
+    tmp_mol = pyscf.M(;atom="$(X.name) 0.0 0.0 -$(R/2);
+                             $(X.name) 0.0 0.0 $(R/2)",
                       basis
                       )
     id_selected_aos = [i for (i,m) in enumerate(eval_abs_ms(tmp_mol)) if m≤grid.mmax]

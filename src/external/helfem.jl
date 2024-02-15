@@ -93,6 +93,7 @@ function extract_ref_data(basis::String, files::Vector{String})
     TΨs_ref = []
     grids = QuadGrid[]
     Energies = Float64[]
+    quadrupoles = Float64[]
     Elements = nothing
 
     # Run through all JSON file.
@@ -136,9 +137,10 @@ function extract_ref_data(basis::String, files::Vector{String})
             push!(grids, grid)
             push!(Ψs_ref, Ψs)
             push!(Energies, data["Total energy"])
+            push!(quadrupoles, data["Total quadrupole"])
         end
     end
 
     # Return all data as a NamedTuple
-    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies))
+    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies, quadrupoles))
 end

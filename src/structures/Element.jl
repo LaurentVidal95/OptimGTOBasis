@@ -38,9 +38,10 @@ len_exps(X::Element{T}) where {T<:Real} = length(vcat([shell.exps for shell in X
 
 # vector -> shells
 # The ForwardDiff type T1 has to be different from T2
-function Element(X_vec::Vector{T1}, X_ref::Element{T2}) where {T1, T2 <:Real}
-    N_exps = sum(X_ref.shape_exps)
-    exps_vec = X_vec[1:N_exps]
+function Element(X_vec::Vector{T1}, X_ref::Element{T2};
+                 exponentiate_exps=false) where {T1, T2 <:Real}
+    N_exps = len_exps(X_ref)
+    exps_vec = exponentiate_exps ? exp.(X_vec[1:N_exps]) : X_vec[1:N_exps]
     coeffs_vec = X_vec[N_exps+1:end]
 
     pop_many!(x,n) = [popfirst!(x) for _ in 1:n]

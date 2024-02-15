@@ -26,14 +26,32 @@ function Base.show(io::IO, crit::ProjectionCriterion)
     println(io, "Projection criterion for the $(crit.norm_type) norm")
 end
 
+function orthogonal_projection(A::Element{T1}, B::Element{T1}, R::T2,
+                               Ψ::Matrix{T3}, TΨ::Matrix{T3},
+                               grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
+    C = eval_AOs(grid, A, B, R)
+    M = overlap(grid, A, R; norm_type)
+    Mm12 = inv(sqrt(Symmetric(M)))
+    C⁰ = C*Mm12
+
+    # Orthogonal projection for the given norm
+    N_ao = size(C,2)
+    Π = zeros(N_ao, N_ao)
+    begin
+        (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
+        (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
+    end
+    C⁰*Π
+end
+
 """
 Since ΨA and ΨB are equal for the current test casses I only put
 Ψ_ref instead of ΨA, ΨB as argument.
 T1 is the ForwardDiff compatible type, T2 is to be Float64 and T3 may be complex.
 """
 function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
-                       Ψ::Matrix{T3}, TΨ::Matrix{T3},
-                       grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
+                         Ψ::Matrix{T3}, TΨ::Matrix{T3},
+                         grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
     # Compute L² or H¹ projection on the AO basis
     C = eval_AOs(grid, A, B, R)
     M = overlap(grid, A, R; norm_type)
@@ -152,8 +170,8 @@ function objective_function(criterion::EnergyCriterion, A₀::Element, B₀::Ele
     Y[1:n_exps] .= exp.(Y[1:n_exps])
 
     # Compute criterion
-    J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, Rh)
-        j_E_diatomic(Y, A₀, B₀, Rh/2, E)
+    J_Rhs = map(zip(criterion.reference_energies, criterion.interatomic_distances)) do (E, R)
+        j_E_diatomic(Y, A₀, B₀, R/2, E)
     end
     sum(J_Rhs) / length(criterion.reference_energies)
 end
