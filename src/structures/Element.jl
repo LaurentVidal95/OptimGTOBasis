@@ -8,18 +8,19 @@ shelltype(T) = NamedTuple{(:exps, :coeffs), Tuple{Vector{T}, Matrix{T}}}
 Simple struct to organize all parameters by shells
 """
 struct Element{T<:Real}
-    name::String
-    basis::String
-    shells::Vector{shelltype(T)}
+    name         ::String
+    charge       ::Int
+    basis        ::String
+    shells       ::Vector{shelltype(T)}
     # Shape of the exps vectors and coeffs matrices to switch from
     # single vector to Element form.
-    shape_exps::Vector{Int64}
-    shape_coeffs::Vector{Tuple{Int64, Int64}}
+    shape_exps   ::Vector{Int64}
+    shape_coeffs ::Vector{Tuple{Int64, Int64}}
 end
-function Element(name::String, basis::String, shells::Vector{shelltype(T)}) where {T<:Real}
+function Element(name::String, charge::Int, basis::String, shells::Vector{shelltype(T)}) where {T<:Real}
     shape_exps = [length(shell.exps) for shell in shells]
     shape_coeffs = [size(shell.coeffs) for shell in shells]
-    Element(name, basis, shells, shape_exps, shape_coeffs)
+    Element(name, charge, basis, shells, shape_exps, shape_coeffs)
 end
 
 """
@@ -50,7 +51,7 @@ function Element(X_vec::Vector{T1}, X_ref::Element{T2}) where {T1, T2 <:Real}
         coeffs = reshape(pop_many!(coeffs_vec, prod(β)), β)
         push!(shells, (; exps, coeffs))
     end
-    Element(X_ref.name, X_ref.basis, shells)
+    Element(X_ref.name, X_ref.charge, X_ref.basis, shells)
 end
 
 """
@@ -63,11 +64,9 @@ Output:
 """
 function extract_elements(data::Dict{String, Any}, basis::String)
     # Extract info from data
-    Z1, Z2 = data["Z1"], data["Z2"]
-    elements = element_name.([Z1,Z2])
-    # Create GTO basis coefficient and exponent for each elements
-    # using basis_set_exchange
-    bse_elements = parse_bse_elements(elements, basis)
+    Z1, Z2 = Int64(data["Z1"]), Int64(data["Z2"])
+    # Extract basis data for given element using basis_set_exchange
+    bse_elements = parse_bse_elements([Z1, Z2], basis)
 
     # Case Z1=Z2
     if length(bse_elements) == 1
@@ -101,11 +100,14 @@ Return a vector whose elements contain a list of shell
 and associated exponent and coefficients of contracted Gaussians
 for that shell.
 """
-function parse_bse_elements(elements_names::Vector{String}, basis_name::String)
+function parse_bse_elements(element_charges::Vector{Int}, basis_name::String)
+    element_names = element_name.(element_charges)
     bse = pyimport("basis_set_exchange")
-    basis = bse.get_basis(basis_name, elements_names, make_general=true)
+    basis = bse.get_basis(basis_name, element_names, make_general=true)
     parsed_shells = parse_bse_shells.(values(basis["elements"]))
-    [Element(name, basis_name, shells) for (name, shells) in zip(elements_names, parsed_shells)]
+    # Return everything in Element structure
+    [Element(name, charge, basis_name, shells) for (name, charge, shells) in
+                               zip(element_names, element_charges, parsed_shells)]
 end
 
 """

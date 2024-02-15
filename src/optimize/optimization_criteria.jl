@@ -58,7 +58,7 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
         (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
         (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
     end
-    only(Ψ_norm .- sum(Π'Π))
+    sum(diag(Ψ_norm .- sum(Π'Π))) / length(Ψ)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                        R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},

@@ -93,6 +93,7 @@ function extract_ref_data(basis::String, files::Vector{String})
     TΨs_ref = []
     grids = QuadGrid[]
     Energies = Float64[]
+    Elements = nothing
 
     # Run through all JSON file.
     for filename in files # joinpath.(Ref(datadir), readdir(datadir))
@@ -106,23 +107,32 @@ function extract_ref_data(basis::String, files::Vector{String})
             end
             # Extracta and normalize reference eigenfunctions
             grid = QuadGrid(data)
-            # DEBUG: Only alpha here....
+            Rh = data["Rh"]
+
+            # DEBUG: Only for closed-shell systems (2 everywhere)
             Ψs = reference_eigenvectors(data)[1]
             TΨs = reference_kinetic(data)[1]
-            # Sanity checks
-            # Check that the functions are real
             @assert(norm(imag.(Ψs)) < 1e-10)
             @assert(norm(imag.(TΨs)) < 1e-10)
             Ψs = real.(Ψs)
             TΨs = real.(TΨs)
+
             # Check that Ψs are orthonormal and check kinetic term precision
+            # The tols are fixed for H2. Might break
+            # also check quadrupole
             @assert norm(dot(grid, Ψs, Ψs) - I) < 1e-8 ""*
                 "Reference eigenfunctions are not orthonormal"
-            @assert norm(sum(2*dot(grid, Ψs, TΨs)) - data["Kinetic energy"]) < 1e-6
+            @assert norm(sum(diag(2*dot(grid, Ψs, TΨs))) - data["Kinetic energy"]) < 1e-6 ""*
+                "Kinetic energies do not corresponds"
+            test_quad = norm(quadrupole(grid, Elements..., Ψs, Rh*2)[end] - data["Total quadrupole"])
+            if test_quad > 1e-5
+                @warn "Low quadrupole precision for interatomic distance $(Rh*2)!\n"*
+                    "Distance to ref: $(test_quad)"
+            end
 
             # Add data to reference dict
             push!(TΨs_ref, TΨs)
-            push!(Rhs, data["Rh"])
+            push!(Rhs, Rh)
             push!(grids, grid)
             push!(Ψs_ref, Ψs)
             push!(Energies, data["Total energy"])
