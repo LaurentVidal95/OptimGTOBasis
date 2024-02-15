@@ -62,7 +62,7 @@ Output:
      Each NamedTuple corresponds to a shell (s, p, d, ...)
 """
 function extract_elements(data::Dict{String, Any}, basis::String)
-    # Extract info from data    
+    # Extract info from data
     Z1, Z2 = data["Z1"], data["Z2"]
     elements = element_name.([Z1,Z2])
     # Create GTO basis coefficient and exponent for each elements
@@ -98,7 +98,7 @@ end
 
 """
 Return a vector whose elements contain a list of shell
-and associated exponent and coefficients of contracted Gaussians 
+and associated exponent and coefficients of contracted Gaussians
 for that shell.
 """
 function parse_bse_elements(elements_names::Vector{String}, basis_name::String)
@@ -128,27 +128,33 @@ From given elements and elements name, write an AO basis file in NWChem format
 (the one that seems closer to our data structure and that is understood by pyscf).
 """
 function basis_string(Elements::Vector{Element{T}}) where {T<:Real}
-    El_names = [X.name for X in Elements]
-    @assert(length(Elements)==length(El_names))
-    shells_names = ["S","P","D","F","G"]
-
     # Loop over all Elements
-    test = ""
-    for (El, El_name) in zip(Elements, El_names)
-        for (i, shell) in enumerate(El.shells)
-            shell_name = shells_names[i]
-            test *= "$(El_name)   $(shell_name)\n"
-            # header
-            mat2write = hcat(shell.exps, shell.coeffs)
-            n_AO = size(shell.coeffs,2)
-            for row in eachrow(mat2write)
-                fmt =  Printf.Format("     "*"%10.8f    "^(n_AO+1))
-                test *= Printf.format(fmt, row...)*"\n"
-            end
+    basis_str = ""
+    for El in Elements
+        basis_str *= basis_string(El)
+    end
+    basis_str
+end
+function basis_string(El::Element{T}) where {T<:Real}
+    basis_str = ""
+    shells_names = ["S","P","D","F","G", "H"]
+
+    for (i, shell) in enumerate(El.shells)
+        shell_name = shells_names[i]
+        basis_str *= "$(El.name)   $(shell_name)\n"
+        # header
+        mat2write = hcat(shell.exps, shell.coeffs)
+        n_AO = size(shell.coeffs,2)
+        for row in eachrow(mat2write)
+            fmt =  Printf.Format("     "*"%10.8f    "^(n_AO+1))
+            basis_str *= Printf.format(fmt, row...)*"\n"
         end
     end
-    test
+    basis_str
 end
+basis_string(X::Vector{T}, El::Element{T}) where {T<:Real} =
+    basis_string(Element(X, El))
+
 function save_basis(Elements::Vector{Element{T}}, file) where {T<:Real}
     basis_str = basis_string(Elements)
     open(file, "w") do output_file

@@ -25,6 +25,8 @@ export default_spread_lim
 export Element
 export extract_elements
 
+# TODO: modify.. the AO struct is useless now
+# Also create a basis struct that ease the writing and use with pyscf
 # atomic orbitals
 export construct_AOs
 export eval_AOs
@@ -32,14 +34,10 @@ include("structures/QuadGrid.jl")
 include("structures/Element.jl")
 include("structures/AO.jl")
 
-# Extract data from basis_set_exchange
-export reference_eigenvectors
-export extract_ref_data
-
 # Construct and solve optimization problem
 export ProjectionCriterion
 export EnergyCriterion
-export j_L2_diatomic           # optimize ||Ψ_ref - proj(Ψ_ref)||_L²
+export j_proj_diatomic         # optimize ||Ψ_ref - proj(Ψ_ref)||_A
 export j_E_diatomic            # optimize ||E(X) - E_ref||^2
 export launch_Optim
 export launch_Ipopt
@@ -48,10 +46,14 @@ include("optimize/setup_optim.jl")
 
 # HelFEM and PySCF
 export generate_basis_file
+export reference_eigenvectors
+export extract_ref_data
 export ipopt_setup_bounds!
 export ipopt_setup_optim_model
 include("external/helfem.jl")
 include("external/pyscf.jl")
 include("external/ipopt.jl")
+
+include("quantities.jl")
 
 end # module
