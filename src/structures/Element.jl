@@ -17,7 +17,8 @@ struct Element{T<:Real}
     shape_exps   ::Vector{Int64}
     shape_coeffs ::Vector{Tuple{Int64, Int64}}
 end
-function Element(name::String, charge::Int, basis::String, shells::Vector{shelltype(T)}) where {T<:Real}
+function Element(name::String, charge::Int, basis::String,
+                 shells::Vector{shelltype(T)}) where {T<:Real}
     shape_exps = [length(shell.exps) for shell in shells]
     shape_coeffs = [size(shell.coeffs) for shell in shells]
     Element(name, charge, basis, shells, shape_exps, shape_coeffs)
@@ -53,6 +54,10 @@ function Element(X_vec::Vector{T1}, X_ref::Element{T2};
         push!(shells, (; exps, coeffs))
     end
     Element(X_ref.name, X_ref.charge, X_ref.basis, shells)
+end
+function Element(El_name::String, basis::String, coeffs::Vector{T}) where {T<:Real}
+    X_ref = only(extract_coeffs_and_exponents([El_name], basis))
+    Element(coeffs, X_ref)
 end
 
 """
@@ -124,55 +129,4 @@ function parse_bse_shells(element; T=Float64)
         push!(parsed_shells, (;exps, coeffs))
     end
     parsed_shells
-end
-
-"""
-From given elements and elements name, write an AO basis file in NWChem format
-(the one that seems closer to our data structure and that is understood by pyscf).
-"""
-function basis_string(Elements::Vector{Element{T}}) where {T<:Real}
-    # Loop over all Elements
-    basis_str = ""
-    for El in Elements
-        basis_str *= basis_string(El)
-    end
-    basis_str
-end
-function basis_string(El::Element{T}) where {T<:Real}
-    basis_str = ""
-    shells_names = ["S","P","D","F","G", "H"]
-
-    for (i, shell) in enumerate(El.shells)
-        shell_name = shells_names[i]
-        basis_str *= "$(El.name)   $(shell_name)\n"
-        # header
-        mat2write = hcat(shell.exps, shell.coeffs)
-        n_AO = size(shell.coeffs,2)
-        for row in eachrow(mat2write)
-            fmt =  Printf.Format("     "*"%10.8f    "^(n_AO+1))
-            basis_str *= Printf.format(fmt, row...)*"\n"
-        end
-    end
-    basis_str
-end
-basis_string(X::Vector{T}, El::Element{T}) where {T<:Real} =
-    basis_string(Element(X, El))
-
-function save_basis(Elements::Vector{Element{T}}, file) where {T<:Real}
-    basis_str = basis_string(Elements)
-    open(file, "w") do output_file
-        println(output_file, basis_str)
-    end
-    nothing
-end
-
-function Base.show(io::IO, X::Element)
-    println(io, "Element: $(X.name)")
-    println(io, "Basis type: $(X.basis)")
-    println(io, basis_string([X]))
-end
-
-function Element(El_name::String, basis::String, coeffs::Vector{T}) where {T<:Real}
-    X_ref = only(extract_coeffs_and_exponents([El_name], basis))
-    Element(coeffs, X_ref)
 end

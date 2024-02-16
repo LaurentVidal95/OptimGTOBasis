@@ -33,6 +33,7 @@ export eval_AOs
 include("structures/QuadGrid.jl")
 include("structures/Element.jl")
 include("structures/AO.jl")
+include("structures/BasisSet.jl")
 
 # Construct and solve optimization problem
 export ProjectionCriterion

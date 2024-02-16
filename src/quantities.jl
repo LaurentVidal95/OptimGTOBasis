@@ -9,8 +9,8 @@ function quadrupole(grid::QuadGrid, A::Element, B::Element, Ψs::Matrix{T}, R::T
     for i in 1:3
         for j in 1:3
             δᵢⱼ = iszero(i-j) ? one(i) : zero(i)
-            quadmoment_n_terms = map(enumerate(grid.points)) do (iX, X)
-                (1/2)*grid.weights[iX]*( 3*X[i]*X[j] - δᵢⱼ*norm(X)^2 )*ρ[iX]
+            quadmoment_n_terms = map(enumerate(grid.points)) do (ir, r)
+                (1/2)*grid.weights[ir]*( 3*r[i]*r[j] - δᵢⱼ*norm(r)^2 )*ρ[ir]
             end
             quadmoment[i, j] -= sum(quadmoment_n_terms)
         end

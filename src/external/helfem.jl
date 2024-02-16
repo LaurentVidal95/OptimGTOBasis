@@ -20,11 +20,18 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     cmd_output = read(Cmd(cmd_in), String)
     cmd_output = split(cmd_output,"\n",keepempty=false)
     println(cmd_output)
+
     # parse output to check kinetic and total energy
     parsed_energies = filter(x->(contains(x, "Total") || contains(x, "Kinetic")) &&
                              (contains(x, "energy")), cmd_output)[end-1:end]
     e_kin = parse(Float64, split(parsed_energies[1], " ")[end])
     e_tot = parse(Float64, split(parsed_energies[2], " ")[end])
+
+    # parse dipole moments
+    parsed_dipole = split.(filter(x->contains(x, "dipole"), cmd_output), " "; keepempty=false)
+    μ_elec = parse(Float64, parsed_dipole[1][4])
+    μ_nuc = parse(Float64, parsed_dipole[2][4])
+    μ_tot = parse(Float64, parsed_dipole[3][4])
 
     # pase quadrupole moments
     parsed_quadrupole = split.(filter(x->contains(x,"quadrupole"), cmd_output),
@@ -32,6 +39,7 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     Q_elec = parse(Float64, parsed_quadrupole[1][4])
     Q_nuc = parse(Float64, parsed_quadrupole[2][4])
     Q_tot = parse(Float64, parsed_quadrupole[3][4])
+
 
     # 3) Extract grid data from checkfile
     output_file = "$(output_dir)/helfem_$(Rbond).hdf5"
@@ -46,6 +54,9 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     # Add energies and quadrupole to the HDF5 file.
     h5write(output_file, "Kinetic energy", e_kin)
     h5write(output_file, "Total energy", e_tot)
+    h5write(output_file, "Electronic dipole", μ_elec)
+    h5write(output_file, "Nuclear dipole", μ_nuc)
+    h5write(output_file, "Total dipole", μ_tot)
     h5write(output_file, "Electronic quadrupole", Q_elec)
     h5write(output_file, "Nuclear quadrupole", Q_nuc)
     h5write(output_file, "Total quadrupole", Q_tot)
