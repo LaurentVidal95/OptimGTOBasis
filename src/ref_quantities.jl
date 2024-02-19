@@ -16,8 +16,11 @@ function orthogonal_projection(A::Element, B::Element, R::T1,
     C⁰*Π
 end
 
-function quadrupole(grid::QuadGrid, A::Element, B::Element, Ψs::Matrix{T}, R::T) where {T<:Real}
+function quadrupole_moment(grid::QuadGrid, A::Element, B::Element,
+                           Ψs::Matrix{T}, R::T;
+                           verbose=true) where {T<:Real}
     # DEBUG: only for closed shell... Otherwise you have to track the alpha and beta part..
+    (verbose) && (@warn "For closed shell only!")
     ρ = 2*sum(map(x->x .^2, eachcol(Ψs))) # density associated to Ψ
 
     quadmoment = zeros(3,3)
@@ -36,36 +39,21 @@ function quadrupole(grid::QuadGrid, A::Element, B::Element, Ψs::Matrix{T}, R::T
     quadmoment
 end
 
-function compare_quadrupoles_homoatomic(file::String, bases::Vector{String}, bases_names, ref_data)
-    @warn "Only for closed shell homoatomic molecule"
-    @assert isfile(file)
-    data = open(JSON3.read, file)
+function dipole_moment()
+    nothing #TODO
+end
 
-    output = Dict{Any, Any}()
-    # run on bases
-    for (basis, name) in zip(bases, bases_names)
-        A = Element(Vector(data[name]), ref_data.Elements[1])
-        P = ProjectionCriterion(ref_data)
+function polarisability(mol::PyObject; ε=1e-4, kwargs...)
+    # Extract data from the mol object
+    A = mol.atom_symbol(0) # element 1
+    B = mol.atom_symbol(1) # element 2
+    R = norm(mol.atom_coord(1) - mol.atom_coord(0))
 
-        output[name] = zeros(length(bases), 2)
-        for i in 1:length(ref_data.Ψs_ref)
+    # Add running Helfem and computing finite difference of the energy with constant
+    # electronic field in the z direction.
+    α = zero(Int64)
 
-            # Extract ref data for the i-th file
-            R = P.interatomic_distances[i]
-            grid = P.grids[i]
-            Ψ = P.reference_functions[i]
-            TΨ = P.reference_kinetics[i]
+    # TODO
 
-            # Compute orthogonal projections in L² and H¹ norms
-            Ψ_proj_L2 = orthogonal_projection(A, A, R, Ψ, TΨ, grid; norm_type=:L²)
-            # Ψ_proj_H1 = orthogonal_projection(A, A, R, Ψ, TΨ, grid; norm_type=:H¹)
-
-            # Compute corresponding approximate quadrupoles Qzz
-            quad_L2 = quadrupole(grid, A, A, Ψ_proj_L2, R)[end]
-            quad_H1 = quadrupole(grid, A, A, Ψ_proj_H1, R)[end]
-            output[name][i,1] = quad_L2
-            output[name][i,2] = quad_H1
-        end
-    end
-    output
+    α
 end
