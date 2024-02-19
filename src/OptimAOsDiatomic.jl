@@ -55,6 +55,6 @@ include("external/helfem.jl")
 include("external/pyscf.jl")
 include("external/ipopt.jl")
 
-include("quantities.jl")
+include("ref_quantities.jl")
 
 end # module

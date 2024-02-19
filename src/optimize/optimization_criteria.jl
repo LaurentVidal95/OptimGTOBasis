@@ -26,24 +26,6 @@ function Base.show(io::IO, crit::ProjectionCriterion)
     println(io, "Projection criterion for the $(crit.norm_type) norm")
 end
 
-function orthogonal_projection(A::Element{T1}, B::Element{T1}, R::T2,
-                               Ψ::Matrix{T3}, TΨ::Matrix{T3},
-                               grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
-    C = eval_AOs(grid, A, B, R)
-    M = overlap(grid, A, R; norm_type)
-    Mm12 = inv(sqrt(Symmetric(M)))
-    C⁰ = C*Mm12
-
-    # Orthogonal projection for the given norm
-    N_ao = size(C,2)
-    Π = zeros(N_ao, N_ao)
-    begin
-        (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
-        (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
-    end
-    C⁰*Π
-end
-
 """
 Since ΨA and ΨB are equal for the current test casses I only put
 Ψ_ref instead of ΨA, ΨB as argument.

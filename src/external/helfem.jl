@@ -2,7 +2,8 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
                     multiplicity=1,
                     method="HF",
                     output_dir= Z1==Z2 ? Z1*"2_data" : Z1*Z2*"_data",
-                    helfem_path) where {T<:Real}
+                    helfem_path,
+                    write_hdf5=true) where {T<:Real}
     # List of helfem routines
     helfem_commands = [joinpath(helfem_path, "objdir/src", command) for command in
                        ["diatomic_cbasis", "diatomic", "diatomic_dgrid"]]
@@ -19,8 +20,36 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
               "--M=$(multiplicity)", "--method=$(method)", "--save=$(output_dir)/helfem_$(Rbond).chk"]
     cmd_output = read(Cmd(cmd_in), String)
     cmd_output = split(cmd_output,"\n",keepempty=false)
-    println(cmd_output)
 
+    # parse output to check kinetic and total energy
+    parsed_output = parse_helfem_output(cmd_output)
+
+    # 3) Extract grid data from checkfile
+    if write_hdf5
+        output_file = "$(output_dir)/helfem_$(Rbond).hdf5"
+        cmd_in = [helfem_commands[3], "--load=$(output_dir)/helfem_$(Rbond).chk",
+                  "--output=$(output_file)"]
+        read(Cmd(cmd_in), String)
+
+        # Clean the working dir
+        rm("$(output_dir)/helfem_$(Rbond).chk")
+        isfile("fort.9") && rm("fort.9")
+
+        # Add parsed data to the HDF5 file.
+        h5write(output_file, "Kinetic energy", parsed_output.e_kin)
+        h5write(output_file, "Total energy", parsed_output.e_tot)
+        h5write(output_file, "Electronic dipole", parsed_output.μ_elec)
+        h5write(output_file, "Nuclear dipole", parsed_output.μ_nuc)
+        h5write(output_file, "Total dipole", parsed_output.μ_tot)
+        h5write(output_file, "Electronic quadrupole", parsed_output.Q_elec)
+        h5write(output_file, "Nuclear quadrupole", parsed_output.Q_nuc)
+        h5write(output_file, "Total quadrupole", parsed_output.Q_tot)
+        h5write(output_file, "Hellmann-Feynman force", parsed_output.f_HF)
+    end
+    nothing
+end
+
+function parse_helfem_output(cmd_output::String)
     # parse output to check kinetic and total energy
     parsed_energies = filter(x->(contains(x, "Total") || contains(x, "Kinetic")) &&
                              (contains(x, "energy")), cmd_output)[end-1:end]
@@ -40,28 +69,11 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     Q_nuc = parse(Float64, parsed_quadrupole[2][4])
     Q_tot = parse(Float64, parsed_quadrupole[3][4])
 
+    # parse forces
+    force_string = split(only( filter(x->contains(x, "Hellmann-Feynman"), cmd_output)), " ")[end]
+    f_HF = parse(Float64, force_string)
 
-    # 3) Extract grid data from checkfile
-    output_file = "$(output_dir)/helfem_$(Rbond).hdf5"
-    cmd_in = [helfem_commands[3], "--load=$(output_dir)/helfem_$(Rbond).chk",
-              "--output=$(output_file)"]
-    read(Cmd(cmd_in), String)
-
-    # Clean the working dir
-    rm("$(output_dir)/helfem_$(Rbond).chk")
-    isfile("fort.9") && rm("fort.9")
-
-    # Add energies and quadrupole to the HDF5 file.
-    h5write(output_file, "Kinetic energy", e_kin)
-    h5write(output_file, "Total energy", e_tot)
-    h5write(output_file, "Electronic dipole", μ_elec)
-    h5write(output_file, "Nuclear dipole", μ_nuc)
-    h5write(output_file, "Total dipole", μ_tot)
-    h5write(output_file, "Electronic quadrupole", Q_elec)
-    h5write(output_file, "Nuclear quadrupole", Q_nuc)
-    h5write(output_file, "Total quadrupole", Q_tot)
-
-    nothing
+    (; e_kin, e_tot, μ_elec, μ_nuc, μ_tot, Q_elec, Q_nuc, Q_tot, f_HF)
 end
 
 function generate_reference_data(Z1::String, Z2::String, bond_lengths::Vector{T};
@@ -105,6 +117,7 @@ function extract_ref_data(basis::String, files::Vector{String})
     grids = QuadGrid[]
     Energies = Float64[]
     quadrupoles = Float64[]
+    forces = Float64[]
     Elements = nothing
 
     # Run through all JSON file.
@@ -149,9 +162,10 @@ function extract_ref_data(basis::String, files::Vector{String})
             push!(Ψs_ref, Ψs)
             push!(Energies, data["Total energy"])
             push!(quadrupoles, data["Total quadrupole"])
+            push!(forces, data["Hellmann-Feynman force"])
         end
     end
 
     # Return all data as a NamedTuple
-    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies, quadrupoles))
+    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies, quadrupoles, forces))
 end

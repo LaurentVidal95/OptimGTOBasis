@@ -1,5 +1,7 @@
 using JSON3
 
+import Base.vec
+
 struct BasisSet
     name
     str
@@ -19,7 +21,7 @@ function read_basis_file(Z_el::Int, ref_basis::String, file::String)
     end
     basis_sets
 end
-             
+
 """
 From given elements and elements name, write an AO basis file in NWChem format
 (the one that seems closer to our data structure and that is understood by pyscf).

@@ -55,10 +55,6 @@ function Element(X_vec::Vector{T1}, X_ref::Element{T2};
     end
     Element(X_ref.name, X_ref.charge, X_ref.basis, shells)
 end
-function Element(El_name::String, basis::String, coeffs::Vector{T}) where {T<:Real}
-    X_ref = only(extract_coeffs_and_exponents([El_name], basis))
-    Element(coeffs, X_ref)
-end
 
 """
 Construct the Element objects associated to a given HelFEM file and GTO basis.

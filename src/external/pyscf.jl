@@ -7,16 +7,19 @@ function energy(mol::PyObject)
     @assert rhf.converged "SCF not converged"
     energy(mol, rhf)
 end
+function energy(mol::Function, basis::String, R::T; verbose=false) where {T<:Real}
+    mol_R = mol(basis, R; verbose)
+    energy(mol_R)
+end
 
-function dipole_moment(mol::PyObject, C::AbstractArray; verbose=false)
+function dipole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
     # TODO: sanity checks
     R1 = mol.atom_coords()[1,3];  R2 = mol.atom_coords()[2,3]
     Z1 = mol.atom_charge(0);      Z2 = mol.atom_charge(1)
     μz_mat = mol.intor("int1e_z")
-    ρ = 2*C*C'
 
     μ_elec = -tr(μz_mat*ρ)
-    μ_nuc = (Z1*R1 + Z2*R2)
+    μ_nuc = convert(Float64, (Z1*R1 + Z2*R2))
     if verbose
         @show "Nuclear $(μ_nuc)"
         @show "Electronic $(μ_elec)"
@@ -25,18 +28,19 @@ function dipole_moment(mol::PyObject, C::AbstractArray; verbose=false)
 end
 function dipole_moment(mol::PyObject; verbose=false)
     No, Nd = mol.nelec; Ns = No - Nd;
+    @show No
     rhf = mol.RHF().run()
+    ρ = rhf.make_rdm1()
+    @show rhf.e_tot
     @assert rhf.converged "SCF not converged"
-    dipole_moment(mol, rhf.mo_coeff[:,No]; verbose)
+    dipole_moment(mol, ρ; verbose)
 end
 
-function quadrupole_moment(mol::PyObject, C::AbstractArray; verbose=false)
+function quadrupole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
     # Sanity checks
     No, Nd = mol.nelec; Ns = No - Nd;
     @assert iszero(Ns) "System has to be a closed shell system"
     @assert iszero(mol.atom_coords()[1:2,1:2]) "Atoms have to be on the Z axis"
-
-    ρ = 2*C*C'
 
     Q_mat_zz = 3*mol.intor("int1e_zz") - mol.intor("int1e_r2")
     Q_mat_xx = (3/2)*(mol.intor("int1e_r2") -mol.intor("int1e_zz")) - mol.intor("int1e_r2")
@@ -48,7 +52,7 @@ function quadrupole_moment(mol::PyObject, C::AbstractArray; verbose=false)
     # Nuclear contribution
     Z1, Z2 = mol.atom_charge(0), mol.atom_charge(1)
     R = norm(mol.atom_coords()[1,:] - mol.atom_coords()[2,:])
-    Q_nuc = [0.0, 0.0, (Z1+Z2)*(R^2)/4]
+    Q_nuc = convert.(Float64, [0.0, 0.0, (Z1+Z2)*(R^2)/4])
 
     if verbose
         @info "Nuclear: $(Q_nuc)"
@@ -60,8 +64,9 @@ end
 function quadrupole_moment(mol::PyObject; verbose=false)
     No, Nd = mol.nelec; Ns = No - Nd;
     rhf = mol.RHF().run()
+    ρ = rhf.make_rdm1()
     @assert rhf.converged "SCF not converged"
-    quadrupole_moment(mol, rhf.mo_coeff[:,No]; verbose)
+    quadrupole_moment(mol, ρ; verbose)
 end
 
 function eq_interatomic_distance(mol::PyObject, rhf::PyObject)
@@ -82,9 +87,9 @@ function eq_interatomic_distance(mol::PyObject)
     eq_interatomic_distance(mol, rhf)
 end
 
-
 function dissociation_curve(mol::F, bases::Vector{String},
-                            basis_names::Vector{String}, distances::Vector{T};
+                            basis_names::Vector{String},
+                            distances::Vector{T};
                             output_file=nothing, ) where
                             {T<:Real, F}
     # Compute RHF and FCI dissociation curve
@@ -105,3 +110,18 @@ function dissociation_curve(mol::F, bases::Vector{String},
     !isnothing(output_file) && (open(io->JSON3.write(io, output, allow_inf=true), output_file, "w"))
     output_file
 end
+
+function force_FD(mol::Function, basis::String, R::T; ε=1e-5, verbose=false) where {T<:Real}
+    E⁻ = energy(mol, basis, R - ε/2; verbose)
+    E⁺ = energy(mol, basis, R + ε/2)
+    (E⁺ - E⁻)/ε
+end
+
+function ∂2E_FD(mol::Function, basis::String, R::T;
+                ε=1e-5, verbose=false) where {T<:Real}
+    F⁻ = force_FD(mol, basis, R .- ε/2; ε, verbose)
+    F⁺ = force_FD(mol, basis, R .+ ε/2; ε, verbose)
+    (F⁺ - F⁻)/ε
+end
+
+#function polarisability(mol

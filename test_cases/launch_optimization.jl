@@ -21,6 +21,15 @@ function optimize_AO_basis(basis::String, datadir::String, criterion_type;
     error("Not supposed to happen")
 end
 
+X2_mol(el::String, basis::String, R; verbose=0) =
+        OAO.pyscf.M(;
+                    atom = "$(el) 0.0 0.0 -$(R/2);
+                            $(el) 0.0 0.0 $(R/2)",
+                    basis,
+                    unit="bohr",
+                    verbose
+                    )
+
 H2_mol(basis::String, R; verbose=0) =
     OAO.pyscf.M(;
         atom = "H 0.0 0.0 -$(R/2);
