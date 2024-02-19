@@ -49,7 +49,7 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     nothing
 end
 
-function parse_helfem_output(cmd_output::String)
+function parse_helfem_output(cmd_output)
     # parse output to check kinetic and total energy
     parsed_energies = filter(x->(contains(x, "Total") || contains(x, "Kinetic")) &&
                              (contains(x, "energy")), cmd_output)[end-1:end]
@@ -149,7 +149,8 @@ function extract_ref_data(basis::String, files::Vector{String})
                 "Reference eigenfunctions are not orthonormal"
             @assert norm(sum(diag(2*dot(grid, Ψs, TΨs))) - data["Kinetic energy"]) < 1e-6 ""*
                 "Kinetic energies do not corresponds"
-            test_quad = norm(quadrupole(grid, Elements..., Ψs, Rh*2)[end] - data["Total quadrupole"])
+            test_quad = norm(quadrupole_moment(grid, Elements..., Ψs, Rh*2, verbose=false)[end]
+                             - data["Total quadrupole"])
             if test_quad > 1e-5
                 @warn "Low quadrupole precision for interatomic distance $(Rh*2)!\n"*
                     "Distance to ref: $(test_quad)"

@@ -28,10 +28,8 @@ function dipole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
 end
 function dipole_moment(mol::PyObject; verbose=false)
     No, Nd = mol.nelec; Ns = No - Nd;
-    @show No
     rhf = mol.RHF().run()
     ρ = rhf.make_rdm1()
-    @show rhf.e_tot
     @assert rhf.converged "SCF not converged"
     dipole_moment(mol, ρ; verbose)
 end

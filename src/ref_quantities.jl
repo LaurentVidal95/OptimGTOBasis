@@ -16,6 +16,24 @@ function orthogonal_projection(A::Element, B::Element, R::T1,
     C⁰*Π
 end
 
+function dipole_moment(grid::QuadGrid, A::Element, B::Element,
+                       Ψs::Matrix{T}, R::T;
+                       verbose=true) where {T<:Real}
+    # DEBUG: only for closed shell... Otherwise you have to track the alpha and beta part..
+    (verbose) && (@warn "For closed shell only!")
+    ρ = 2*sum(map(x->x .^2, eachcol(Ψs))) # density associated to Ψ
+
+    dipoles = zeros(3)
+    dipoles[end] = (R/2)*(B.charge - A.charge) # nuclear contribution in the zz dipole moment
+    for i in 1:3
+        dipole_i = map(enumerate(grid.points)) do (ir, r)
+            grid.weights[ir]*r[i]*ρ[ir]
+        end
+        dipoles[i] -= sum(dipole_i)
+    end
+    dipoles
+end
+
 function quadrupole_moment(grid::QuadGrid, A::Element, B::Element,
                            Ψs::Matrix{T}, R::T;
                            verbose=true) where {T<:Real}
@@ -37,10 +55,6 @@ function quadrupole_moment(grid::QuadGrid, A::Element, B::Element,
         end
     end
     quadmoment
-end
-
-function dipole_moment()
-    nothing #TODO
 end
 
 function polarisability(mol::PyObject; ε=1e-4, kwargs...)
