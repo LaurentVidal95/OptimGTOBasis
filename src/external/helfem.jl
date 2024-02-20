@@ -3,7 +3,8 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
                     method="HF",
                     output_dir= Z1==Z2 ? Z1*"2_data" : Z1*Z2*"_data",
                     helfem_path,
-                    write_hdf5=true) where {T<:Real}
+                    write_hdf5=true,
+                    helfem_kwargs...) where {T<:Real}
     # List of helfem routines
     helfem_commands = [joinpath(helfem_path, "objdir/src", command) for command in
                        ["diatomic_cbasis", "diatomic", "diatomic_dgrid"]]
@@ -16,8 +17,12 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
     cmd_output = split(read(command, String), "\n"; keepempty=false)[end]
 
     # 2) Run the .diatomic command
+    # extract the helfem_kwargs as strings
+    additional_kwargs = ["--$(key)=$(value)" for (key,value) in
+                         zip(keys(helfem_kwargs), values(helfem_kwargs))]
     cmd_in = [helfem_commands[2], String.(split(cmd_output," "; keepempty=false))...,
-              "--M=$(multiplicity)", "--method=$(method)", "--save=$(output_dir)/helfem_$(Rbond).chk"]
+              "--M=$(multiplicity)", "--method=$(method)", "--save=$(output_dir)/helfem_$(Rbond).chk",
+              additional_kwargs...]
     cmd_output = read(Cmd(cmd_in), String)
     cmd_output = split(cmd_output,"\n",keepempty=false)
 
@@ -45,6 +50,11 @@ function run_helfem(Z1::String, Z2::String, Rbond::T;
         h5write(output_file, "Nuclear quadrupole", parsed_output.Q_nuc)
         h5write(output_file, "Total quadrupole", parsed_output.Q_tot)
         h5write(output_file, "Hellmann-Feynman force", parsed_output.f_HF)
+        return nothing
+    else
+        isfile("fort.9") && rm("fort.9")
+        rm(output_dir; recursive=true)
+        return parsed_output
     end
     nothing
 end

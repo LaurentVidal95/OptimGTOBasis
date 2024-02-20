@@ -33,6 +33,8 @@ function dipole_moment(mol::PyObject; verbose=false)
     @assert rhf.converged "SCF not converged"
     dipole_moment(mol, ρ; verbose)
 end
+dipole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
+    dipole_moment(mol(basis, R); verbose)
 
 function quadrupole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
     # Sanity checks
@@ -66,6 +68,8 @@ function quadrupole_moment(mol::PyObject; verbose=false)
     @assert rhf.converged "SCF not converged"
     quadrupole_moment(mol, ρ; verbose)
 end
+quadrupole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
+    quardupole_moment(mol(basis, R); verbose)
 
 function eq_interatomic_distance(mol::PyObject, rhf::PyObject)
     # Define python function that wrapps geometry optimization
@@ -122,4 +126,3 @@ function ∂2E_FD(mol::Function, basis::String, R::T;
     (F⁺ - F⁻)/ε
 end
 
-#function polarisability(mol

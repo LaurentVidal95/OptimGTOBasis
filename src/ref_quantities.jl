@@ -57,17 +57,29 @@ function quadrupole_moment(grid::QuadGrid, A::Element, B::Element,
     quadmoment
 end
 
-function polarisability(mol::PyObject; ε=1e-4, kwargs...)
+function polarisability(mol::PyObject, Ez::T; FD_type=:four_point,
+                        ε=1e-8, kwargs...) where {T<:Real}
+    @assert FD_type ∈ (:two_point, :four_point)
+
     # Extract data from the mol object
     A = mol.atom_symbol(0) # element 1
     B = mol.atom_symbol(1) # element 2
     R = norm(mol.atom_coord(1) - mol.atom_coord(0))
-
-    # Add running Helfem and computing finite difference of the energy with constant
+    helfem_energy(ez) = run_helfem(A, B, R; write_hdf5=false, Ez=Ez+ez, kwargs...).e_tot
+    
+    # Run Helfem and computing finite difference of the energy with constant
     # electronic field in the z direction.
-    α = zero(Int64)
-
-    # TODO
-
-    α
+    αz = zero(R)
+    if FD_type==:two_point
+        Em = helfem_energy(Ez - ε/2)
+        Ep = helfem_energy(Ez + ε/2)
+        αz =  (Ep - Em)/ε
+    else
+        E2m = helfem_energy(Ez - 2*ε)
+        Em  = helfem_energy(Ez - ε)
+        Ep  = helfem_energy(Ez + ε)
+        E2p = helfem_energy(Ez + 2*ε)
+        αz = (-E2p + 8*Ep - 8*Em + E2m) / (12*ε)
+    end
+    -αz
 end
