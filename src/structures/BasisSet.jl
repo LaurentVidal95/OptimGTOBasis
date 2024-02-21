@@ -7,6 +7,7 @@ struct BasisSet
     str
     tag
 end
+BasisSet(name::String) = BasisSet(name, name, :standard)
 tag(B::BasisSet) = B.tag
 
 function read_basis_file(Z_el::Int, ref_basis::String, file::String)

@@ -18,8 +18,8 @@ struct ProjectionCriterion <: OptimizationCriterion
 end
 function ProjectionCriterion(ref_data; gridtol=1e-7, norm_type=:L²)
     @assert norm_type ∈ (:L²,:H¹) # Only L² or H¹ norms
-    ProjectionCriterion(ref_data.Ψs_ref, ref_data.TΨs_ref, norm_type,
-                        ref_data.grids,  gridtol, (ref_data.Rhs .*2))
+    ProjectionCriterion(ref_data.reference_MOs, ref_data.reference_∇MOs, norm_type,
+                        ref_data.grids, gridtol, ref_data.interatomic_distances)
 end
 
 function Base.show(io::IO, crit::ProjectionCriterion)
@@ -81,7 +81,7 @@ struct EnergyCriterion{T<:Real} <: OptimizationCriterion
     interatomic_distances::Vector{T}
 end
 EnergyCriterion(ref_data; kwargs...) =
-    EnergyCriterion(ref_data.Energies, (ref_data.Rhs .*2))
+    EnergyCriterion(ref_data.energies, ref_data.interatomic_distances)
 
 function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
     e_ref::T3) where {T1,T2,T3 <: Real}

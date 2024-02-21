@@ -1,6 +1,6 @@
 function set_starting_point(ref_data; guess=:bse)
     @assert guess ∈ (:bse, :random)
-    A, B = ref_data.Elements
+    A, B = ref_data.elements
     n_params = A==B ? length(vec(A)) : sum(length.(vec(A), vec(B)))
     if guess==:bse
         if (A==B)
@@ -24,16 +24,17 @@ end
 
 
 function launch_Optim(ref_data, criterion::OptimizationCriterion, X_guess;
-                      maxiter=500, solver=ConjugateGradient())
-    A, B = ref_data.Elements
+                      maxiter=500, solver=ConjugateGradient(), tol=1e-8)
+    A, B = ref_data.elements
     f(X) = objective_function(criterion, A, B, X...)
     g!(∇E, X) = grad_objective_function!(criterion, A, B, ∇E, X...)
     # Choose between energy and projection criterion
     if false #isa(criterion, EnergyCriterion)
         return optimize(f, g!, X_guess, solver,
-                        Optim.Options(show_trace=true, iterations=maxiter))
+                        Optim.Options(show_trace=true, iterations=maxiter, g_tol=tol))
     else
-        return optimize(f, X_guess, solver, Optim.Options(show_trace=true, iterations=maxiter))
+        return optimize(f, X_guess, solver, Optim.Options(show_trace=true, iterations=maxiter,
+                                                          g_tol=tol))
     end
     error("Not supposed to happen")
 end

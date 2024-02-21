@@ -1,3 +1,18 @@
+"""
+Wrapper around all functions bellow using pyscf.
+"""
+function pyscf_property(s::Symbol, args...; kwargs...)
+    method = Dict(:energy => energy,
+                  :dipole => dipole_moment,
+                  :quadrupole => quadrupole_moment,
+                  :eq_interatomic_distance => eq_interatomic_distance,
+                  :forces => force_FD,
+                  :energy_second_derivative=>∂2E_FD,
+                  :polarizability=>nothing)
+    return method[s](args...; kwargs...)
+    error("This property is unaccessible for the moment")
+end
+
 energy(mol::PyObject, rhf::PyObject) = rhf.e_tot
 function energy(mol::PyObject)
     # Check that the system is closed-shell
@@ -12,7 +27,10 @@ function energy(mol::Function, basis::String, R::T; verbose=false) where {T<:Rea
     energy(mol_R)
 end
 
-function dipole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
+function dipole_moment(mol::PyObject, rhf::PyObject; verbose=false)
+    # Compute 1-RDM
+    ρ = rhf.make_rdm1()
+
     # TODO: sanity checks
     R1 = mol.atom_coords()[1,3];  R2 = mol.atom_coords()[2,3]
     Z1 = mol.atom_charge(0);      Z2 = mol.atom_charge(1)
@@ -29,14 +47,16 @@ end
 function dipole_moment(mol::PyObject; verbose=false)
     No, Nd = mol.nelec; Ns = No - Nd;
     rhf = mol.RHF().run()
-    ρ = rhf.make_rdm1()
     @assert rhf.converged "SCF not converged"
-    dipole_moment(mol, ρ; verbose)
+    dipole_moment(mol, rhf; verbose)
 end
 dipole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
     dipole_moment(mol(basis, R); verbose)
 
-function quadrupole_moment(mol::PyObject, ρ::AbstractArray; verbose=false)
+function quadrupole_moment(mol::PyObject, rhf::PyObject; verbose=false)
+    # Compute 1-RDM
+    ρ = rhf.make_rdm1()
+
     # Sanity checks
     No, Nd = mol.nelec; Ns = No - Nd;
     @assert iszero(Ns) "System has to be a closed shell system"
@@ -64,12 +84,11 @@ end
 function quadrupole_moment(mol::PyObject; verbose=false)
     No, Nd = mol.nelec; Ns = No - Nd;
     rhf = mol.RHF().run()
-    ρ = rhf.make_rdm1()
     @assert rhf.converged "SCF not converged"
-    quadrupole_moment(mol, ρ; verbose)
+    quadrupole_moment(mol, rhf; verbose)
 end
 quadrupole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
-    quardupole_moment(mol(basis, R); verbose)
+    quadrupole_moment(mol(basis, R); verbose)
 
 function eq_interatomic_distance(mol::PyObject, rhf::PyObject)
     # Define python function that wrapps geometry optimization
@@ -88,30 +107,7 @@ function eq_interatomic_distance(mol::PyObject)
     @assert rhf.converged "SCF not converged"
     eq_interatomic_distance(mol, rhf)
 end
-
-function dissociation_curve(mol::F, bases::Vector{String},
-                            basis_names::Vector{String},
-                            distances::Vector{T};
-                            output_file=nothing, ) where
-                            {T<:Real, F}
-    # Compute RHF and FCI dissociation curve
-    output = Dict{String, Any}()
-
-    for (basis, basis_name) in zip(bases, basis_names)
-        Es_basis = []
-        for R in distances
-            # Construct molecule PyObject
-            mol_R = mol(basis, R)
-            push!(Es_basis, energy(mol_R))
-        end
-        output[basis_name] = Es_basis
-    end
-    output["interatomic_distances"] = distances
-
-    # Write diss curve in JSON file
-    !isnothing(output_file) && (open(io->JSON3.write(io, output, allow_inf=true), output_file, "w"))
-    output_file
-end
+eq_interatomic_distance(mol::Function, basis::String, R) = eq_interatomic_distance(mol(basis,R))
 
 function force_FD(mol::Function, basis::String, R::T; ε=1e-5, verbose=false) where {T<:Real}
     E⁻ = energy(mol, basis, R - ε/2; verbose)
@@ -125,4 +121,3 @@ function ∂2E_FD(mol::Function, basis::String, R::T;
     F⁺ = force_FD(mol, basis, R .+ ε/2; ε, verbose)
     (F⁺ - F⁻)/ε
 end
-

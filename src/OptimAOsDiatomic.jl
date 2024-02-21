@@ -28,8 +28,7 @@ export extract_elements
 # TODO: modify.. the AO struct is useless now
 # Also create a basis struct that ease the writing and use with pyscf
 # atomic orbitals
-export construct_AOs
-export eval_AOs
+export BasisSet
 include("structures/QuadGrid.jl")
 include("structures/Element.jl")
 include("structures/AO.jl")
@@ -47,10 +46,8 @@ include("optimize/setup_optim.jl")
 
 # HelFEM and PySCF
 export generate_basis_file
-export reference_eigenvectors
-export extract_ref_data
-export ipopt_setup_bounds!
-export ipopt_setup_optim_model
+export read_helfem_data
+export pyscf_property
 include("external/helfem.jl")
 include("external/pyscf.jl")
 include("external/ipopt.jl")

@@ -97,86 +97,90 @@ function generate_reference_data(Z1::String, Z2::String, bond_lengths::Vector{T}
 end
 
 # Beware some imaginary parts are non negligeable.
-function reference_eigenvectors(data::Dict{String, Any})
+function reference_mo_coeffs(data::Dict{String, Any})
     ΨA = data["orba.re"] .+ im .* data["orba.im"]
     ΨB = data["orbb.re"] .+ im .* data["orbb.im"]
-    ΨA, ΨB
+    (;α=ΨA, β=ΨB)
 end
 
-function reference_kinetic(data::Dict{String, Any})
+function reference_grad_mo_coeffs(data::Dict{String, Any})
     TΨA = data["Torba.re"] .+ im .* data["Torba.im"]
     TΨB = data["Torbb.re"] .+ im .* data["Torbb.im"]
-    TΨA, TΨB
+    (;α=TΨA, β=TΨB)
 end
 
-function extract_ref_data(basis::String, datadir::String)
+function read_helfem_data(basis::String, datadir::String)
     # Extract raw data
     @assert(isdir(datadir))
     files = joinpath.(Ref(datadir), filter(x->!startswith(x, "_"), readdir(datadir)))
     for file in files
         @info "reading $(file)"
     end
-    extract_ref_data(basis, files)
+    read_helfem_data(basis, files)
 end
-function extract_ref_data(basis::String, files::Vector{String})
+function read_helfem_data(basis::String, files::Vector{String})
     # Extract raw data
     output_data = (;)
-    Rhs = Float64[]
-    Ψs_ref = []
-    TΨs_ref = []
+    interatomic_distances = Float64[]
+    reference_MOs = []
+    reference_∇MOs = []
     grids = QuadGrid[]
-    Energies = Float64[]
+    energies = Float64[]
+    dipoles = Float64[]
     quadrupoles = Float64[]
     forces = Float64[]
-    Elements = nothing
+
+    elements = nothing
 
     # Run through all JSON file.
     for filename in files # joinpath.(Ref(datadir), readdir(datadir))
         h5open(filename) do file
             data = read(file)
             # Extract Elements and grid a single time
-            if (isempty(Rhs))
+            if (isempty(interatomic_distances))
                 A, B = extract_elements(data, basis)
-                Elements = [A,B]
-                output_data = merge(output_data, (;Elements))
+                elements = [A,B]
+                output_data = merge(output_data, (;elements))
             end
             # Extracta and normalize reference eigenfunctions
             grid = QuadGrid(data)
-            Rh = data["Rh"]
+            R = data["Rh"]*2
 
-            # DEBUG: Only for closed-shell systems (2 everywhere)
-            Ψs = reference_eigenvectors(data)[1]
-            TΨs = reference_kinetic(data)[1]
-            @assert(norm(imag.(Ψs)) < 1e-10)
-            @assert(norm(imag.(TΨs)) < 1e-10)
-            Ψs = real.(Ψs)
-            TΨs = real.(TΨs)
+            # DEBUG: Only for closed-shell systems where α and β functions are the same (2 everywhere)
+            Ψ = reference_mo_coeffs(data).α
+            TΨ = reference_grad_mo_coeffs(data).α
 
-            # Check that Ψs are orthonormal and check kinetic term precision
-            # The tols are fixed for H2. Might break
-            # also check quadrupole
-            @assert norm(dot(grid, Ψs, Ψs) - I) < 1e-8 ""*
+            # Safely remove zero imaginary part
+            @assert (norm(imag.(Ψ)) < 1e-10) && (norm(imag.(TΨ)) < 1e-10) "Non zero imaginary pat"
+            Ψ = real.(Ψ)
+            TΨ = real.(TΨ)
+
+            # Check that the MOs are orthonormal and check kinetic term
+            # precision. The tols are fixed for H2. Might break also check quadrupole.
+            @assert norm(dot(grid, Ψ, Ψ) - I) < 1e-8 ""*
                 "Reference eigenfunctions are not orthonormal"
-            @assert norm(sum(diag(2*dot(grid, Ψs, TΨs))) - data["Kinetic energy"]) < 1e-6 ""*
+            @assert norm(sum(diag(2*dot(grid, Ψ, TΨ))) - data["Kinetic energy"]) < 1e-6 ""*
                 "Kinetic energies do not corresponds"
-            test_quad = norm(quadrupole_moment(grid, Elements..., Ψs, Rh*2, verbose=false)[end]
+            test_quad = norm(quadrupole_moment(grid, elements..., Ψ, R, verbose=false)[end]
                              - data["Total quadrupole"])
             if test_quad > 1e-5
-                @warn "Low quadrupole precision for interatomic distance $(Rh*2)!\n"*
+                @warn "Low quadrupole precision for interatomic distance $(R)!\n"*
                     "Distance to ref: $(test_quad)"
             end
 
             # Add data to reference dict
-            push!(TΨs_ref, TΨs)
-            push!(Rhs, Rh)
+            push!(reference_MOs, Ψ)
+            push!(reference_∇MOs, TΨ)
+            push!(interatomic_distances, R)
             push!(grids, grid)
-            push!(Ψs_ref, Ψs)
-            push!(Energies, data["Total energy"])
+            push!(energies, data["Total energy"])
+            ("Total dipole" ∈ keys(data)) && push!(dipoles, data["Total dipole"])
             push!(quadrupoles, data["Total quadrupole"])
             push!(forces, data["Hellmann-Feynman force"])
         end
     end
 
     # Return all data as a NamedTuple
-    merge(output_data, (; Rhs, Ψs_ref, TΨs_ref, grids, basis, Energies, quadrupoles, forces))
+    merge(output_data, (; interatomic_distances, reference_MOs, reference_∇MOs, grids,
+                        basis, energies, dipoles, quadrupoles, forces))
 end
