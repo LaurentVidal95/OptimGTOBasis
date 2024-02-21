@@ -13,7 +13,7 @@ function orthogonal_projection(A::Element, B::Element, R::T1,
         (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
         (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
     end
-    C⁰*Π
+    (;ψ_proj=C⁰*Π, coeffs=Mm12*Π)
 end
 
 function dipole_moment(grid::QuadGrid, A::Element, B::Element,

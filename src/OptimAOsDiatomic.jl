@@ -52,6 +52,12 @@ include("external/helfem.jl")
 include("external/pyscf.jl")
 include("external/ipopt.jl")
 
-include("ref_quantities.jl")
+export compute_pyscf_properties
+export eval_criteria
+export generate_molden
+export plot_quantity
+include("postprocess/quantities.jl")
+include("postprocess/ref_quantities.jl")
+include("postprocess/plot.jl")
 
 end # module

@@ -11,7 +11,7 @@ density ρ_ref on a discretization grid.
 struct ProjectionCriterion <: OptimizationCriterion
     reference_functions   ::Vector{Matrix}
     reference_kinetics    ::Vector{Matrix}
-    norm_type             ::Symbol  # norm for the projection (L² or H¹)
+    norm_type             ::Symbol # norm for the projection (L² or H¹)
     grids                 ::Vector{QuadGrid}
     gridtol               ::Float64
     interatomic_distances ::AbstractVector
@@ -20,6 +20,14 @@ function ProjectionCriterion(ref_data; gridtol=1e-7, norm_type=:L²)
     @assert norm_type ∈ (:L²,:H¹) # Only L² or H¹ norms
     ProjectionCriterion(ref_data.reference_MOs, ref_data.reference_∇MOs, norm_type,
                         ref_data.grids, gridtol, ref_data.interatomic_distances)
+end
+
+function (crit::ProjectionCriterion)(basis::BasisSet, A::Element, B::Element, i::Int)
+    X = vec(basis)
+    j_proj_diatomic(X, A, B, crit.interatomic_distances[i],
+                    crit.reference_functions[i], crit.reference_kinetics[i],
+                    crit.grids[i];
+                    crit.norm_type)
 end
 
 function Base.show(io::IO, crit::ProjectionCriterion)
@@ -43,10 +51,11 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     (norm_type==:H¹) && (Ψ_norm += 2*dot(grid, Ψ, TΨ))
     # Sanity check on the overlap
     if cond(M) > 1e5
+        @show R
         foo = eltype(M)==Float64 ? vec(A) : map(x->x.value, vec(A))
         bar = eltype(M)==Float64 ? M : map(x->x.value, M)
-        @show foo
-        @show bar
+        # @show foo
+        # @show bar
         @warn "Overlap conditioning: $(cond(foo))"
     end
     Mm12 = inv(sqrt(Symmetric(M)))
@@ -61,10 +70,10 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     sum(diag(Ψ_norm .- sum(Π'Π))) / length(Ψ)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
-                       R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},
-                       grid::QuadGrid{T2};
-                       norm_type=:L²
-                       ) where {T1,T2 <: Real, T3}
+                         R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},
+                         grid::QuadGrid{T2};
+                         norm_type=:L²
+                         ) where {T1,T2 <: Real, T3}
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
     (norm_type==:H¹) && (@assert A₀==B₀)
@@ -82,6 +91,11 @@ struct EnergyCriterion{T<:Real} <: OptimizationCriterion
 end
 EnergyCriterion(ref_data; kwargs...) =
     EnergyCriterion(ref_data.energies, ref_data.interatomic_distances)
+
+function (crit::EnergyCriterion)(basis::BasisSet, A::Element, B::Element, i::Int)
+    X = vec(basis)
+    j_E_diatomic(X, A, B, crit.interatomic_distances[i]/2, crit.reference_energies[i])
+end
 
 function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
     e_ref::T3) where {T1,T2,T3 <: Real}
