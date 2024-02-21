@@ -44,7 +44,8 @@ T1 is the ForwardDiff compatible type, T2 is to be Float64 and T3 may be complex
     """
 function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
                          Ψ::Matrix{T3}, TΨ::Matrix{T3},
-                         grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
+                         grid::QuadGrid{T2}; norm_type=:L²,
+                         shift=1) where {T1,T2 <: Real, T3}
     # Compute L² or H¹ projection on the AO basis
     C = eval_AOs(grid, A, B, R)
     M = overlap(grid, A, R; norm_type)
@@ -67,15 +68,16 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     # Compute projection
     Π = zero(Ψ_norm)
     begin
-        (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
-        (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
+        (norm_type==:L²) && (Π = dot(grid, C⁰, shift .* Ψ))
+        (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) + 2*dot(grid, C⁰, TΨ))
     end
     sum(diag(Ψ_norm .- sum(Π'Π))) / length(Ψ)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                          R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},
                          grid::QuadGrid{T2};
-                         norm_type=:L²
+                         norm_type=:L²,
+                         shift=1
                          ) where {T1,T2 <: Real, T3}
     nA = length(vec(A₀))
     # Reshape the vectors XA and XB as shells to be understood by construct_AOs
@@ -85,7 +87,7 @@ function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
     A = Element(XA, A₀)
     B = Element(XB, B₀)
     # return j to minimize
-    j_proj_diatomic(A, B, R, Ψ_ref, TΨ_ref, grid; norm_type)
+    j_proj_diatomic(A, B, R, Ψ_ref, TΨ_ref, grid; norm_type, shift)
 end
 
 struct EnergyCriterion{T<:Real} <: OptimizationCriterion
@@ -110,7 +112,6 @@ function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,
     basis = A==B ? basis_string([A]) : basis_string([A,B])
     # Run pyscf
     mol = pyscf.M(;atom, basis,
-                  symmetry=false,
                   unit="bohr",
                   verbose=0,
                   )
@@ -145,7 +146,8 @@ end
 
 
 function objective_function(criterion::ProjectionCriterion, A₀::Element,
-                            B₀::Element, X::T...) where {T<:Real}
+                            B₀::Element, X::T...;
+                            kwargs...) where {T<:Real}
     Y = collect(X)
 
     # log optimization to ensure that the exponents are positive
@@ -158,9 +160,10 @@ function objective_function(criterion::ProjectionCriterion, A₀::Element,
     end
     J_Rhs = map(enumerate(criterion.interatomic_distances)) do (i, R)
         j_proj_diatomic(Y, A₀, B₀, R,
-                      criterion.reference_functions[i], criterion.reference_kinetics[i],
-                      criterion.grids[i];
-                      criterion.norm_type)
+                        criterion.reference_functions[i], criterion.reference_kinetics[i],
+                        criterion.grids[i];
+                        criterion.norm_type,
+                        kwargs...)
     end
     sum(J_Rhs) / length(criterion.interatomic_distances)
 end

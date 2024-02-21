@@ -44,7 +44,8 @@ function overlap(grid::QuadGrid, X::Element{T}, R; norm_type=:L²) where {T<:Rea
     basis = Dict([X.name => basis_string([X])])
     tmp_mol = pyscf.M(;atom="$(X.name) 0.0 0.0 -$(R/2);
                              $(X.name) 0.0 0.0 $(R/2)",
-                      basis
+                      basis,
+                      unit="bohr"
                       )
     id_selected_aos = [i for (i,m) in enumerate(eval_abs_ms(tmp_mol)) if m≤grid.mmax]
     S = tmp_mol.intor("int1e_ovlp")

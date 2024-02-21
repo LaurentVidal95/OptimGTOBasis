@@ -119,7 +119,7 @@ function eq_interatomic_distance(mol::PyObject)
     eq_interatomic_distance(mol, rhf)
 end
 function eq_interatomic_distance(basis_A::BasisSet, basis_B::BasisSet, R::T;
-                                 verbose=0)
+                                 verbose=0) where {T<:Real}
     eq_interatomic_distance(mol(basis_A, basis_B, R))
 end
 
