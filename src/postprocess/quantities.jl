@@ -1,4 +1,4 @@
-function compute_pyscf_properties(mol::Function, basis_sets::Vector{BasisSet},
+function compute_pyscf_properties(basis_file_A::String, basis_file_B::String,
                                   interatomic_distances::Vector{T}) where {T<:Real}
     # Initialize output data
     data_out = (; interatomic_distances)

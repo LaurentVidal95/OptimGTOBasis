@@ -22,9 +22,12 @@ function ProjectionCriterion(ref_data; gridtol=1e-7, norm_type=:L²)
                         ref_data.grids, gridtol, ref_data.interatomic_distances)
 end
 
-function (crit::ProjectionCriterion)(basis::BasisSet, A::Element, B::Element, i::Int)
-    X = vec(basis)
-    j_proj_diatomic(X, A, B, crit.interatomic_distances[i],
+function (crit::ProjectionCriterion)(basis_A::BasisSet, basis_B::BasisSet, i::Int)
+    A = basis_A.element; B = basis_B.element;
+    X = vec(A); Y = vec(B)
+    Z = X==Y ? X : vcat(X,Y)
+
+    j_proj_diatomic(Z, A, B, crit.interatomic_distances[i],
                     crit.reference_functions[i], crit.reference_kinetics[i],
                     crit.grids[i];
                     crit.norm_type)
@@ -38,7 +41,7 @@ end
 Since ΨA and ΨB are equal for the current test casses I only put
 Ψ_ref instead of ΨA, ΨB as argument.
 T1 is the ForwardDiff compatible type, T2 is to be Float64 and T3 may be complex.
-"""
+    """
 function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
                          Ψ::Matrix{T3}, TΨ::Matrix{T3},
                          grid::QuadGrid{T2}; norm_type=:L²) where {T1,T2 <: Real, T3}
@@ -92,9 +95,12 @@ end
 EnergyCriterion(ref_data; kwargs...) =
     EnergyCriterion(ref_data.energies, ref_data.interatomic_distances)
 
-function (crit::EnergyCriterion)(basis::BasisSet, A::Element, B::Element, i::Int)
-    X = vec(basis)
-    j_E_diatomic(X, A, B, crit.interatomic_distances[i]/2, crit.reference_energies[i])
+function (crit::EnergyCriterion)(basis_A::BasisSet, basis_B::BasisSet, i::Int)
+    A = basis_A.element; B = basis_B.element;
+    X = vec(A); Y = vec(B)
+    Z = X==Y ? X : vcat(X,Y)
+    
+    j_E_diatomic(Z, A, B, crit.interatomic_distances[i]/2, crit.reference_energies[i])
 end
 
 function j_E_diatomic(A::Element{T1}, B::Element{T1}, Rh::T2,

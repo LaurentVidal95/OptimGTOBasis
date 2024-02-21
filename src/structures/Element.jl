@@ -1,5 +1,4 @@
 import Base.vec
-import Base.show
 
 # Just renaming
 shelltype(T) = NamedTuple{(:exps, :coeffs), Tuple{Vector{T}, Matrix{T}}}

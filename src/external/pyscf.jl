@@ -1,3 +1,16 @@
+function mol(basis_A::BasisSet, basis_B::BasisSet, R::T;
+             verbose=0) where {T<:Real}
+    A = basis_A.element
+    B = basis_B.element
+    basis = Dict([A.name => String(basis_A),
+                  B.name => String(basis_B)])
+    
+    atom = "$(A.name) 0.0 0.0 -$(R/2);
+            $(B.name) 0.0 0.0 $(R/2)"
+    unit="bohr"
+    pyscf.M(; atom, basis, unit, verbose)
+end
+
 """
 Wrapper around all functions bellow using pyscf.
 """
@@ -22,10 +35,8 @@ function energy(mol::PyObject)
     @assert rhf.converged "SCF not converged"
     energy(mol, rhf)
 end
-function energy(mol::Function, basis::String, R::T; verbose=false) where {T<:Real}
-    mol_R = mol(basis, R; verbose)
-    energy(mol_R)
-end
+energy(basis_A::BasisSet, basis_B::BasisSet, R::T; verbose=0) where {T<:Real} =
+    energy(mol(basis_A, basis_B, R; verbose))
 
 function dipole_moment(mol::PyObject, rhf::PyObject; verbose=false)
     # Compute 1-RDM
@@ -50,8 +61,8 @@ function dipole_moment(mol::PyObject; verbose=false)
     @assert rhf.converged "SCF not converged"
     dipole_moment(mol, rhf; verbose)
 end
-dipole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
-    dipole_moment(mol(basis, R); verbose)
+dipole_moment(basis_A::BasisSet, basis_B::BasisSet, R::T; verbose=0) where {T<:Real} =
+    dipole_moment(mol(basis_A, basis_B, R; verbose); verbose)
 
 function quadrupole_moment(mol::PyObject, rhf::PyObject; verbose=false)
     # Compute 1-RDM
@@ -87,8 +98,8 @@ function quadrupole_moment(mol::PyObject; verbose=false)
     @assert rhf.converged "SCF not converged"
     quadrupole_moment(mol, rhf; verbose)
 end
-quadrupole_moment(mol::Function, basis::String, R::T; verbose=false) where {T<:Real} =
-    quadrupole_moment(mol(basis, R); verbose)
+quadrupole_moment(basis_A::BasisSet, basis_B::BasisSet, R::T; verbose=0) where {T<:Real} =
+    quadrupole_moment(mol(basis_A, basis_B, R); verbose)
 
 function eq_interatomic_distance(mol::PyObject, rhf::PyObject)
     # Define python function that wrapps geometry optimization
@@ -107,17 +118,21 @@ function eq_interatomic_distance(mol::PyObject)
     @assert rhf.converged "SCF not converged"
     eq_interatomic_distance(mol, rhf)
 end
-eq_interatomic_distance(mol::Function, basis::String, R) = eq_interatomic_distance(mol(basis,R))
+function eq_interatomic_distance(basis_A::BasisSet, basis_B::BasisSet, R::T;
+                                 verbose=0)
+    eq_interatomic_distance(mol(basis_A, basis_B, R))
+end
 
-function force_FD(mol::Function, basis::String, R::T; ε=1e-5, verbose=false) where {T<:Real}
-    E⁻ = energy(mol, basis, R - ε/2; verbose)
-    E⁺ = energy(mol, basis, R + ε/2)
+function force_FD(basis_A::BasisSet, basis_B::BasisSet,
+                  R::T; ε=1e-5, verbose=false) where {T<:Real}
+    E⁻ = energy(basis_A, basis_B, R - ε/2; verbose)
+    E⁺ = energy(basis_A, basis_B, R + ε/2; verbose)
     (E⁺ - E⁻)/ε
 end
 
-function ∂2E_FD(mol::Function, basis::String, R::T;
+function ∂2E_FD(basis_A::BasisSet, basis_B::BasisSet, R::T;
                 ε=1e-5, verbose=false) where {T<:Real}
-    F⁻ = force_FD(mol, basis, R .- ε/2; ε, verbose)
-    F⁺ = force_FD(mol, basis, R .+ ε/2; ε, verbose)
+    F⁻ = force_FD(basis_A, basis_B, R - ε/2; verbose)
+    F⁺ = force_FD(basis_A, basis_B, R + ε/2; verbose)
     (F⁺ - F⁻)/ε
 end

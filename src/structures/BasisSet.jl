@@ -1,50 +1,64 @@
 using JSON3
 
-import Base.vec
+import Base.vec, Base.String, Base.show
 
 struct BasisSet
-    name
-    str
-    tag
+    name    ::String
+    tag     ::Symbol
+    element ::Element
 end
-BasisSet(name::String) = BasisSet(name, name, :standard)
+function BasisSet(charge::Int, name::String)
+    el = only(parse_bse_elements([charge], name))
+    BasisSet(name, :standard, el)
+end
 tag(B::BasisSet) = B.tag
 
-function Base.vec(B::BasisSet)
-    split_str = split.(split(B.str, "\n"; keepempty=false), " "; keepempty=false)
-    el = split_str[1][1]
-
-    # remove label of orbitals to extract only numbers
-    numbers = map(str->parse.(Float64, str), filter(x->el∉x, split_str))
-
-    # Parse exps
-    exps = [x[1] for x in numbers]
-    # Parse coeffs by shells
-    multipop!(tab, N) = [popfirst!(tab) for x in tab[1:N]]
-    i_shell = findall(x->el ∈ x, split_str)
-    len_shells = [i_shell[j+1] - (i_shell[j]+1) for j in 1:length(i_shell)-1]
-    append!(len_shells, length(split_str) - i_shell[end])
-
-    coeffs = []
-    for len in len_shells
-        shell = multipop!(numbers, len)
-        for i_ctr in 2:length(shell[1])
-            append!(coeffs, [x[i_ctr] for x in shell])
-        end
-    end
-
-    Vector{Float64}(vcat(exps, coeffs))
+# Overloads
+Base.String(B::BasisSet) = basis_string([B.element])
+Base.vec(B::BasisSet) = vec(B.element)
+function Base.show(io::IO, X::Element)
+    println(io, "Element: $(X.name)")
+    println(io, "Basis type: $(X.basis)")
+    println(io, basis_string([X]))
 end
+Base.show(io::IO, B::BasisSet) = println("Tag: $(B.tag)", "\n",B.element)
+    
+# function Base.vec(B::BasisSet)
+#     split_str = split.(split(B.str, "\n"; keepempty=false), " "; keepempty=false)
+#     el = split_str[1][1]
 
-function read_basis_file(Z_el::Int, ref_basis::String, file::String)
+#     # remove label of orbitals to extract only numbers
+#     numbers = map(str->parse.(Float64, str), filter(x->el∉x, split_str))
+
+#     # Parse exps
+#     exps = [x[1] for x in numbers]
+#     # Parse coeffs by shells
+#     multipop!(tab, N) = [popfirst!(tab) for x in tab[1:N]]
+#     i_shell = findall(x->el ∈ x, split_str)
+#     len_shells = [i_shell[j+1] - (i_shell[j]+1) for j in 1:length(i_shell)-1]
+#     append!(len_shells, length(split_str) - i_shell[end])
+
+#     coeffs = []
+#     for len in len_shells
+#         shell = multipop!(numbers, len)
+#         for i_ctr in 2:length(shell[1])
+#             append!(coeffs, [x[i_ctr] for x in shell])
+#         end
+#     end
+
+#     Vector{Float64}(vcat(exps, coeffs))
+# end
+
+function read_basis_file(Z_el::Int, ref_basis_name::String, file::String)
     @assert isfile(file)
     data = open(JSON3.read, file)
-    basis_sets = BasisSet[]
+    basis_std = BasisSet(Z_el, ref_basis_name)
+    basis_sets = [basis_std]
 
-    El = only(parse_bse_elements([Z_el], ref_basis))
-    for (basis_name, coeffs) in data
-        basis_str = basis_name==:standard ? ref_basis : basis_string(Vector(coeffs), El)
-        push!(basis_sets, BasisSet(ref_basis, basis_str, basis_name))
+    for (tag, coeffs) in data
+        element_tag = Element(Vector(coeffs), basis_std.element)        
+        basis_tag = BasisSet(ref_basis_name, tag, element_tag)
+        !(tag==:standard) && push!(basis_sets, basis_tag)
     end
     basis_sets
 end
@@ -89,8 +103,3 @@ function save_basis(Elements::Vector{Element{T}}, file) where {T<:Real}
     nothing
 end
 
-function Base.show(io::IO, X::Element)
-    println(io, "Element: $(X.name)")
-    println(io, "Basis type: $(X.basis)")
-    println(io, basis_string([X]))
-end

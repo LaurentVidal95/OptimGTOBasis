@@ -31,13 +31,13 @@ function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
                   B.name => basis_string([B])])
     tmp_mol = pyscf.M(;atom="$(A.name) 0.0 0.0 -$(R/2);
                              $(B.name) 0.0 0.0 $(R/2)",
-                      basis
+                      basis,
+                      unit="bohr"
                       )
     X = pyscf.dft.numint.eval_ao(tmp_mol, grid.points)
     # filter X with mmax: X[:,i]=0 if |m(X[:,i])| > mmax
     id_selected_aos = [i for (i,m) in enumerate(eval_abs_ms(tmp_mol)) if m≤grid.mmax]
     X[:,id_selected_aos]
-
 end
 
 function overlap(grid::QuadGrid, X::Element{T}, R; norm_type=:L²) where {T<:Real}
