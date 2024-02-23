@@ -1,3 +1,20 @@
+function ref_properties(ref_basis_name, refdir)
+    # First compute the reference HELFEM quantities
+    data_helfem = read_helfem_data(ref_basis_name, refdir)
+    # Extract system's name from data
+    el1 = data_helfem.elements[1].name
+    el2 = data_helfem.elements[2].name
+    system = el1==el2 ? el1*"₂" : el1*el2
+
+    ref_data = (; energy=data_helfem.energies,
+                dipole=data_helfem.dipoles,
+                quadrupole=data_helfem.quadrupoles,
+                forces=.- data_helfem.forces,
+                data_helfem.interatomic_distances,
+                system)
+    ref_data
+end
+
 function orthogonal_projection(A::Element, B::Element, R::T1,
                                Ψ::Matrix{T2}, TΨ::Matrix{T2},
                                grid::QuadGrid{T1}; norm_type=:L²) where {T1 <: Real, T2}

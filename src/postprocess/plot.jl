@@ -1,3 +1,5 @@
+using Plots
+
 function plot_quantity(ref_data, pyscf_data, quantity;
                        R_eq_ref=nothing,
                        plot_error = false,
@@ -36,29 +38,19 @@ function plot_quantity(ref_data, pyscf_data, quantity;
     p
 end
 
-function visualize_density(io::String, mol::Function, basis_str::String, ref_data, i;
-                           norm_type=:L²)
-    #Extract data
-    A, B = ref_data.elements
-    R = ref_data.interatomic_distances[i]
-    Ψ = ref_data.reference_MOs[i]
-    TΨ = ref_data.reference_∇MOs[i]
-    grid = ref_data.grids[i]
-
+function visualize_density(io::String, basis_A::BasisSet, basis_B::BasisSet, R)
     # Generate molden with pyscf
-    mol_R = mol(basis_str, R)
+    mol_R = mol(basis_A, basis_B, R)
     No, Nd = mol_R.nelec;
     Nb = convert(Int64, mol_R.nao);
-
-    # PRoject
-    # C_proj = orthogonal_projection(A, B, R, Ψ, TΨ, grid; norm_type).coeffs    
-    # N_missing = Nb-length(C_proj)
-    # C_proj = vcat(C_proj, zeros(N_missing, No))
-    # ρ = 2*C_proj[:,No]*C_proj[:,No]'
     
     # Add zeros to the projection if needed
     rhf = mol_R.RHF().run()
     ρ = rhf.make_rdm1()
     pyscf.tools.cubegen.density(mol_R, io, ρ)
+    nothing
+end
+
+function visualize_density(io::String, ref_data)
     nothing
 end

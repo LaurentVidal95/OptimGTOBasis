@@ -63,15 +63,14 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
         @warn "Overlap conditioning: $(cond(foo))"
     end
     Mm12 = inv(sqrt(Symmetric(M)))
-    C⁰ = C*Mm12
-
+    C⁰ = C*Mm12    
     # Compute projection
     Π = zero(Ψ_norm)
     begin
         (norm_type==:L²) && (Π = dot(grid, C⁰, shift .* Ψ))
         (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) + 2*dot(grid, C⁰, TΨ))
     end
-    sum(diag(Ψ_norm .- sum(Π'Π))) / length(Ψ)
+    sum(diag(Ψ_norm .- Π'Π)) / size(Ψ,2)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                          R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},

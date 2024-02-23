@@ -1,3 +1,4 @@
+using Plots
 using OptimAOsDiatomic
 import OptimAOsDiatomic as OAO
 

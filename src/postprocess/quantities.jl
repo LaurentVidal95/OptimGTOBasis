@@ -40,7 +40,7 @@ function compute_pyscf_properties(basis_sets::Vector{Tuple{BasisSet, BasisSet}},
     return merge(data_out, (; basis=basis_sets[1][1].name))
 end
 
-function eval_criteria(basis_sets::Vector{BasisSet}, ref_data)
+function eval_criteria(basis_sets::Vector{Tuple{BasisSet, BasisSet}}, ref_data)
     A, B = ref_data.elements
     Ecrit = EnergyCriterion(ref_data)
     P0crit = ProjectionCriterion(ref_data)
@@ -48,15 +48,16 @@ function eval_criteria(basis_sets::Vector{BasisSet}, ref_data)
 
     data = []
     n_data = length(ref_data.interatomic_distances)
-    for basis in basis_sets
-        @info "Computing criteria for basis $(basis.tag)"
-        (basis.tag==:standard) && (basis = BasisSet(basis.name, basis_string([A]), :standard))
-        data_E  = map(i -> Ecrit(basis, A, B, i),  1:n_data)
-        data_L2 = map(i -> P0crit(basis, A, B, i), 1:n_data)
-        data_H1 = map(i -> P1crit(basis, A, B, i), 1:n_data)
+    for (basis_A, basis_B) in basis_sets
+        @assert basis_A.tag == basis_B.tag
+        @info "Computing criteria for basis $(basis_A.tag)"
+        data_E  = map(i -> Ecrit(basis_A, basis_B,  i),  1:n_data)
+        data_L2 = map(i -> P0crit(basis_A, basis_B, i), 1:n_data)
+        data_H1 = map(i -> P1crit(basis_A, basis_B, i), 1:n_data)
         push!(data, (; energy=data_E, L2_projection=data_L2,
                       H1_projection=data_H1))
     end
-    NamedTuple{Tuple(tag.(basis_sets))}(data)
+    tags = map(Bs -> Bs[1].tag, basis_sets)
+    NamedTuple{Tuple(tags)}(data)
 end
     
