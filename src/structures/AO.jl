@@ -26,7 +26,8 @@ function eval_abs_ms(mol::PyObject)
 end
 
 function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
-                  R::T2) where {T1, T2<:Real}
+                  R::T2; deriv=0) where {T1, T2<:Real}
+    @assert deriv ∈ (0,2) # never use first derivative
     basis = Dict([A.name => basis_string([A]),
                   B.name => basis_string([B])])
     tmp_mol = pyscf.M(;atom="$(A.name) 0.0 0.0 -$(R/2);
@@ -34,7 +35,16 @@ function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
                       basis,
                       unit="bohr"
                       )
-    X = pyscf.dft.numint.eval_ao(tmp_mol, grid.points)
+    X = pyscf.dft.numint.eval_ao(tmp_mol, grid.points; deriv)
+    if deriv==2
+        # X is a tensor. The first coordinates are
+        # 1: AOs on the grid
+        # 2-4: Derivative along x, y and z axes
+        # 5-10: Second derivatives along xx, xy, xz, yy, yz, zz, hence the 5, 8, and last.
+        # The laplacian is sum(xx, yy, zz)
+        X = X[5, :, :] .+ X[8,:,:] .+ X[10,:,:]
+    end
+
     # filter X with mmax: X[:,i]=0 if |m(X[:,i])| > mmax
     id_selected_aos = [i for (i,m) in enumerate(eval_abs_ms(tmp_mol)) if m≤grid.mmax]
     X[:,id_selected_aos]

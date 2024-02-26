@@ -58,8 +58,6 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
         @show R
         foo = eltype(M)==Float64 ? vec(A) : map(x->x.value, vec(A))
         bar = eltype(M)==Float64 ? M : map(x->x.value, M)
-        # @show foo
-        # @show bar
         @warn "Overlap conditioning: $(cond(foo))"
     end
     Mm12 = inv(sqrt(Symmetric(M)))
@@ -69,7 +67,10 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     begin
         (norm_type==:L²) && (Π = dot(grid, C⁰, shift .* Ψ))
         (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) + 2*dot(grid, C⁰, TΨ))
+        # (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) -
+        #                        dot(grid, eval_AOs(grid, A, B, R; deriv=2), Ψ))
     end
+    (norm_type == :H¹) && (return sum(diag(Ψ_norm .- Π'Π)[end]) / size(Ψ,2))
     sum(diag(Ψ_norm .- Π'Π)) / size(Ψ,2)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
