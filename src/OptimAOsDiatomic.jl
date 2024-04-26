@@ -43,6 +43,7 @@ export launch_Optim
 export launch_Ipopt
 include("optimize/optimization_criteria.jl")
 include("optimize/setup_optim.jl")
+include("optimize/optimize.jl")
 
 # HelFEM and PySCF
 export generate_basis_file

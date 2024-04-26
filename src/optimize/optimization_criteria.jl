@@ -52,11 +52,6 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     N_ao = size(C, 2)
     N_mo = size(Ψ, 2)
 
-    test = 
-    # Ψs_norm
-    # Ψ_norm = dot(grid, Ψ, Ψ)
-    # (norm_type==:H¹) && (Ψ_norm += 2*dot(grid, Ψ, TΨ))
-
     # Sanity check on the overlap
     if cond(SA) > 1e5
         foo = eltype(SA)==Float64 ? vec(A) : map(x->x.value, vec(A))
@@ -69,9 +64,9 @@ function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
     Π = zeros(eltype(C), N_ao, N_mo)
     begin
         (norm_type==:L²) && (Π = dot(grid, C, shift .* Ψ))
-        # (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) + 2*dot(grid, C, TΨ))
         (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) -
                              dot(grid, eval_AOs(grid, A, B, R; deriv=2), Ψ))
+        # (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) + 2*dot(grid, C, TΨ)) # OLD (keep for debug)
     end
     -2*tr(Π'*SA_inv*Π)
 end

@@ -24,7 +24,7 @@ end
 
 
 function launch_Optim(ref_data, criterion::OptimizationCriterion, X_guess;
-                      maxiter=500, solver=LBFGS(), tol=5e-9)
+                      maxiter=500, solver=LBFGS(), tol=5e-9, kwargs...)
     A, B = ref_data.elements
     f(X) = objective_function(criterion, A, B, X...; kwargs...)
     # Choose between energy and projection criterion
