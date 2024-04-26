@@ -19,18 +19,19 @@ function orthogonal_projection(A::Element, B::Element, R::T1,
                                Ψ::Matrix{T2}, TΨ::Matrix{T2},
                                grid::QuadGrid{T1}; norm_type=:L²) where {T1 <: Real, T2}
     C = eval_AOs(grid, A, B, R)
-    M = overlap(grid, A, R; norm_type)
-    Mm12 = inv(sqrt(Symmetric(M)))
-    C⁰ = C*Mm12
+    SA = overlap(grid, A, B, R; norm_type)
+    SA_inv = inv(Symmetric(SA))
 
     # Orthogonal projection for the given norm
     N_ao = size(C,2)
-    Π = zeros(N_ao, N_ao)
+    N_mo = size(Ψ,2)
+    Π = zeros(eltype(C), N_ao, N_mo)
     begin
         (norm_type==:L²) && (Π = dot(grid, C⁰, Ψ))
-        (norm_type==:H¹) && (Π = dot(grid, C⁰, Ψ) + 2*dot(grid, C⁰, TΨ))
+        (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) -
+                             dot(grid, eval_AOs(grid, A, B, R; deriv=2), Ψ))
     end
-    (;ψ_proj=C⁰*Π, coeffs=Mm12*Π)
+    C*SA_inv*Π
 end
 
 function dipole_moment(grid::QuadGrid, A::Element, B::Element,

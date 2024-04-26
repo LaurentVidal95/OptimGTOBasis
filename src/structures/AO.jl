@@ -50,10 +50,10 @@ function eval_AOs(grid::QuadGrid, A::Element{T1}, B::Element{T1},
     X[:,id_selected_aos]
 end
 
-function overlap(grid::QuadGrid, X::Element{T}, R; norm_type=:L²) where {T<:Real}
-    basis = Dict([X.name => basis_string([X])])
-    tmp_mol = pyscf.M(;atom="$(X.name) 0.0 0.0 -$(R/2);
-                             $(X.name) 0.0 0.0 $(R/2)",
+function overlap(grid::QuadGrid, A::Element{T}, B::Element{T}, R; norm_type=:L²) where {T<:Real}
+    basis = Dict([X.name => basis_string([X]) for X in (A,B)])
+    tmp_mol = pyscf.M(;atom="$(A.name) 0.0 0.0 -$(R/2);
+                             $(B.name) 0.0 0.0 $(R/2)",
                       basis,
                       unit="bohr"
                       )

@@ -45,33 +45,35 @@ T1 is the ForwardDiff compatible type, T2 is to be Float64 and T3 may be complex
 function j_proj_diatomic(A::Element{T1}, B::Element{T1}, R::T2,
                          Ψ::Matrix{T3}, TΨ::Matrix{T3},
                          grid::QuadGrid{T2}; norm_type=:L²,
-                         shift=1) where {T1,T2 <: Real, T3}
+                         shift=1.) where {T1,T2 <: Real, T3}
     # Compute L² or H¹ projection on the AO basis
     C = eval_AOs(grid, A, B, R)
-    M = overlap(grid, A, R; norm_type)
+    SA = overlap(grid, A, B, R; norm_type)
+    N_ao = size(C, 2)
+    N_mo = size(Ψ, 2)
 
-    # Ψ_s_norm
-    Ψ_norm = dot(grid, Ψ, Ψ)
-    (norm_type==:H¹) && (Ψ_norm += 2*dot(grid, Ψ, TΨ))
+    test = 
+    # Ψs_norm
+    # Ψ_norm = dot(grid, Ψ, Ψ)
+    # (norm_type==:H¹) && (Ψ_norm += 2*dot(grid, Ψ, TΨ))
+
     # Sanity check on the overlap
-    if cond(M) > 1e5
-        @show R
-        foo = eltype(M)==Float64 ? vec(A) : map(x->x.value, vec(A))
-        bar = eltype(M)==Float64 ? M : map(x->x.value, M)
-        @warn "Overlap conditioning: $(cond(foo))"
+    if cond(SA) > 1e5
+        foo = eltype(SA)==Float64 ? vec(A) : map(x->x.value, vec(A))
+        bar = eltype(SA)==Float64 ? SA : map(x->x.value, SA)
+        @warn "Bad overlap conditioning ($(cond(foo))) for interatomic distance $R a.u."
     end
-    Mm12 = inv(sqrt(Symmetric(M)))
-    C⁰ = C*Mm12    
+    SA_inv = inv(Symmetric(SA))
     # Compute projection
-    Π = zero(Ψ_norm)
+    
+    Π = zeros(eltype(C), N_ao, N_mo)
     begin
-        (norm_type==:L²) && (Π = dot(grid, C⁰, shift .* Ψ))
-        (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) + 2*dot(grid, C⁰, TΨ))
-        # (norm_type==:H¹) && (Π = dot(grid, C⁰, shift .* Ψ) -
-        #                        dot(grid, eval_AOs(grid, A, B, R; deriv=2), Ψ))
+        (norm_type==:L²) && (Π = dot(grid, C, shift .* Ψ))
+        # (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) + 2*dot(grid, C, TΨ))
+        (norm_type==:H¹) && (Π = dot(grid, C, shift .* Ψ) -
+                             dot(grid, eval_AOs(grid, A, B, R; deriv=2), Ψ))
     end
-    (norm_type == :H¹) && (return sum(diag(Ψ_norm .- Π'Π)[end]) / size(Ψ,2))
-    sum(diag(Ψ_norm .- Π'Π)) / size(Ψ,2)
+    -2*tr(Π'*SA_inv*Π)
 end
 function j_proj_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
                          R::T2, Ψ_ref::Matrix{T3}, TΨ_ref::Matrix{T3},
@@ -129,20 +131,20 @@ function j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
     # return j to minimize
     j_E_diatomic(A, B, Rh, e_ref)
 end
-function ∇j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
-                       Rh::T2, e_ref::T3) where {T1,T2,T3 <: Real}
-    ∇j = []
-    len_X = length(X)
-    h = 1e-4
-    for i in 1:len_X
-        Xᵢph = X .+ [zeros(i-1)..., (h/2), zeros(len_X-i)...]
-        Xᵢmh = X .- [zeros(i-1)..., (h/2), zeros(len_X-i)...]
-        ∂i_j = (1/h)*(j_E_diatomic(Xᵢph, A₀, B₀, Rh, e_ref) -
-                      j_E_diatomic(Xᵢmh, A₀, B₀, Rh, e_ref))
-        push!(∇j, ∂i_j)
-    end
-    ∇j
-end
+# function ∇j_E_diatomic(X::Vector{T1}, A₀::Element{T2}, B₀::Element{T2},
+#                        Rh::T2, e_ref::T3) where {T1,T2,T3 <: Real}
+#     ∇j = []
+#     len_X = length(X)
+#     h = 1e-4
+#     for i in 1:len_X
+#         Xᵢph = X .+ [zeros(i-1)..., (h/2), zeros(len_X-i)...]
+#         Xᵢmh = X .- [zeros(i-1)..., (h/2), zeros(len_X-i)...]
+#         ∂i_j = (1/h)*(j_E_diatomic(Xᵢph, A₀, B₀, Rh, e_ref) -
+#                       j_E_diatomic(Xᵢmh, A₀, B₀, Rh, e_ref))
+#         push!(∇j, ∂i_j)
+#     end
+#     ∇j
+# end
 
 
 function objective_function(criterion::ProjectionCriterion, A₀::Element,
